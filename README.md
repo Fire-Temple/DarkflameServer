@@ -3,7 +3,7 @@
 See the original README for DarkflameUniverse Liscence / Server Information:                       
 [Darkflame Universe README](https://github.com/Fire-Temple/DarkflameServer/blob/main/README_original.md)
 
-## Setting up Fresh Server
+## Building server from source
 **If you know what you're doing** and have setup a DLU server before, follow the same steps from whatever guide you used before                   
 with the exception of the points below:
 
@@ -15,7 +15,7 @@ with the exception of the points below:
 
 <br>
 
-### If this is your first time setting up Darkflame Universe
+### If this is your first time building Darkflame Universe
 
 Setup a DarkflameUniverse server first, then come back to migrate your DLU Server using the guide further down                               
 [DLU Repository](https://github.com/DarkflameUniverse/DarkflameServer)            
