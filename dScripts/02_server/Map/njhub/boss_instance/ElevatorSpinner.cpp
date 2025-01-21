@@ -108,7 +108,7 @@ void ElevatorSpinner::TriggerDrill(Entity* self) {
 	
 
 //	Move spinner	
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
 
 //	Play anim	
 	RenderComponent::PlayAnimation(self, u"up");

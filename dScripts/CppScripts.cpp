@@ -384,10 +384,8 @@
 #include "SimpleMoverSwitch.h"
 
 //Nj properties
-#include "ZoneEarthProperty.h"
-#include "ZoneIceProperty.h"
-#include "ZoneLightningProperty.h"
-#include "ZoneFireProperty.h"
+#include "NjPropertyServer.h"
+
 
 
 namespace {
@@ -792,10 +790,7 @@ namespace {
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_GARMADON_TORNADO.lua", []() { return new FtGarmadonTornado(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_MANAGER_SERVER.lua", []() { return new FtBossManager(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_ACTIVATORS_SERVER.lua", []() { return new FtBossActivators(); } },	
-		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_EARTH_PROPERTY.lua", []() { return new ZoneEarthProperty(); } },		
-		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_ICE_PROPERTY.lua", []() { return new ZoneIceProperty(); } },	
-		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_LIGHTNING_PROPERTY.lua", []() { return new ZoneLightningProperty(); } },	
-		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_FIRE_PROPERTY.lua", []() { return new ZoneFireProperty(); } },	
+		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_NINJAGO_PROPERTY.lua", []() { return new NjPropertyServer(); } },	
 
 	};
 

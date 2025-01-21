@@ -17,7 +17,17 @@ PropertyVendorComponent::PropertyVendorComponent(Entity* parent) : Component(par
 }
 
 void PropertyVendorComponent::OnUse(Entity* originator) {
-	if (PropertyManagementComponent::Instance() == nullptr) return;
+	
+//	precondition check for njprops
+	if (Game::zoneManager->GetZoneID().GetMapID() >= 2050 && Game::zoneManager->GetZoneID().GetMapID() <= 2053) {
+		auto* character = originator->GetCharacter();
+		if (!character->GetPlayerFlag(Game::zoneManager->GetZoneID().GetMapID() + 30000)) {
+			return;	
+		}
+	}
+//	end		
+	
+	if (PropertyManagementComponent::Instance() == nullptr) return;	
 
 	OnQueryPropertyData(originator, originator->GetSystemAddress());
 
