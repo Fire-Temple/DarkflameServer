@@ -162,7 +162,17 @@ void NjPropertyServer::OnZonePropertyRented(Entity* self, Entity* player) {
 		if (safe) {
 			safe->Activate();
 		}
-	}	
+	}
+	
+//	remove rail	
+	for (auto* spawner : Game::zoneManager->GetSpawnersInGroup("Rail_Rail")) {		
+		spawner->Deactivate();
+	}
+
+	for (auto* rail : Game::entityManager->GetEntitiesInGroup("Rail_Rail")) {		
+		rail->Smash(rail->GetObjectID(), eKillType::SILENT);
+	}
+	
 }
 
 void NjPropertyServer::OnZonePropertyModelPlaced(Entity* self, Entity* player) {
