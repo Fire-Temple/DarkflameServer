@@ -123,14 +123,17 @@ void NjPropertyServer::OnPlayerLoaded(Entity* self, Entity* player) {
 //		orb spawner		
 			for (auto* orbSpawner : Game::zoneManager->GetSpawnersByName("Orb")) {
 				orbSpawner->Activate();
-			}		
+			}					
+//		rail qb spawner			
+			for (auto* rail : Game::zoneManager->GetSpawnersInGroup("Rail_Rail")) {		
+				rail->Spawn();
+			}
 			
 //		claim marker spawner		
 //			for (auto* markerSpawner : Game::zoneManager->GetSpawnersByName("")) {
 //				markerSpawner->DestroyAllEntities();
 //			}			
-		
-			self->AddTimer(StartOrbTimer, 0.1f);		
+	
 		} else {
 //			TODO: set network var for base music on					
 		}
@@ -185,45 +188,60 @@ LWOOBJID NjPropertyServer::GetOwner() {
 	return manager == nullptr ? LWOOBJID_EMPTY : manager->GetOwnerId();
 }
 
+void NjPropertyServer::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, 
+int32_t param1, int32_t param2) {
+	
+	if (name == "RailWasUsed") {
+		if (Game::zoneManager->GetZoneID().GetMapID() == 2050) {
+			self->AddTimer("PlayRailCine", 1.2f);		
+			self->AddTimer("SmashOrb", 3.6f);	
+		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2051) {	
+		
+		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2052) {	
+
+		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {			
+	}	
+}	
+
 void NjPropertyServer::OnTimerDone(Entity* self, std::string timerName) {
 	
-	if (timerName == StartOrbTimer) {
-		self->SetVar<bool>(CollidedVariable, false);
-		auto orbs = Game::entityManager->GetEntitiesInGroup(self->GetVar<std::string>(ImagOrbGroup));
-		if (orbs.empty()) {
-			self->AddTimer(StartOrbTimer, 0.5f);
-			return;
+	if (timerName == "SmashOrb") {
+//		Notifies the client that the property has been claimed with a flag, completes missions too
+		const auto playerID = self->GetVar<LWOOBJID>(PlayerIDVariable);
+		auto* player = Game::entityManager->GetEntity(playerID);
+		if (player != nullptr) {
+			
+			
+			if (Game::zoneManager->GetZoneID().GetMapID() == 2050) {
+				GameMessages::SendPlayFXEffect(playerID, 10148, u"create", 
+				"darkitect_portal_onhit_earth");				
+			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2051) {
+				GameMessages::SendPlayFXEffect(playerID, 10150, u"create", 
+				"darkitect_portal_onhit_ice");					
+			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2052) {
+				GameMessages::SendPlayFXEffect(playerID, 10151, u"create", 
+				"darkitect_portal_onhit_lightning");	
+			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {				
+				GameMessages::SendPlayFXEffect(playerID, 10149, u"create", 
+				"darkitect_portal_onhit_fire");				
+			}
+			
+			auto* character = player->GetCharacter();
+			if (character != nullptr) {
+				character->SetPlayerFlag(self->GetVar<int32_t>(defeatedProperyFlag), true);
+			}
+		}	
+					
+		for (auto* entity : Game::entityManager->GetEntitiesInGroup("Orb")) {
+			entity->Smash();
 		}
 
-		for (auto* orb : orbs) {
-			orb->AddCollisionPhantomCallback([self, this](Entity* other) {
-				if (other != nullptr && other->IsPlayer() && !self->GetVar<bool>(CollidedVariable)) {
-					self->SetVar<bool>(CollidedVariable, true);
-
-//					GameMessages::SendPlayCinematic(other->GetObjectID(), u"DestroyMaelstrom", other->GetSystemAddress());
-
-					// Notifies the client that the property has been claimed with a flag, completes missions too
-					auto* player = Game::entityManager->GetEntity(self->GetVar<LWOOBJID>(PlayerIDVariable));
-					if (player != nullptr) {
-						auto* character = player->GetCharacter();
-						if (character != nullptr) {
-							character->SetPlayerFlag(self->GetVar<int32_t>(defeatedProperyFlag), true);
-						}
-					}	
-					
-					for (auto* entity : Game::entityManager->GetEntitiesInGroup("Orb")) {
-						entity->Smash();
-					}
-
-					for (auto* spawner : Game::zoneManager->GetSpawnersByName("Orb")) {
-						if (!spawner) return;
-						spawner->DestroyAllEntities();
-						spawner->Deactivate();
-					}				
-					
-				}
-				});
-		}
+		for (auto* spawner : Game::zoneManager->GetSpawnersByName("Orb")) {
+			if (!spawner) return;
+			spawner->DestroyAllEntities();
+			spawner->Deactivate();
+		}	
+		
 	} else if (timerName == RunPlayerLoadedAgainTimer) {
 		CheckForOwner(self);
 	} else if (timerName == BoundsVisOnTimer) {
@@ -235,7 +253,14 @@ void NjPropertyServer::OnTimerDone(Entity* self, std::string timerName) {
 				RenderComponent::PlayAnimation(border, u"BorderIn");
 			}
 		}		
-	}	
+	} else if (timerName == "PlayRailCine") {	
+	
+		const auto playerID = self->GetVar<LWOOBJID>(PlayerIDVariable);
+		auto* player = Game::entityManager->GetEntity(playerID);
+		if (player) {
+			GameMessages::SendPlayCinematic(player->GetObjectID(), u"RailUse", player->GetSystemAddress());	
+		}
+	}
 }
 
 

@@ -1,6 +1,7 @@
 #include "NjRailActivatorsServer.h"
 #include "QuickBuildComponent.h"
 #include "SkillComponent.h"
+#include "dZoneManager.h"
 #include "Character.h"
 
 //	Temp place to store DartSpinner Fire Activator
@@ -24,7 +25,17 @@ void NjRailActivatorsServer::OnUse(Entity* self, Entity* user) {
 		self->SetVar<LWOOBJID>(u"lastUserID", user->GetObjectID());
 
 		self->AddTimer("FailRebuild", 1);	
-	}	
+	}
+	if (Game::zoneManager->GetZoneID().GetMapID() >= 2050 && Game::zoneManager->GetZoneID().GetMapID() <= 2053) {	
+		self->SetNetworkVar<bool>(u"NetworkNotActive", true);	
+		self->SetVar<bool>(u"NotActive", true);	
+		if (quickBuildComponent == nullptr || quickBuildComponent->GetState() == eQuickBuildState::COMPLETED) {		
+			auto* zoneControl = Game::zoneManager->GetZoneControlObject();
+			if (zoneControl != nullptr) {
+				zoneControl->NotifyObject(self, "RailWasUsed");
+			}
+		}	
+	}
 }
 
 void NjRailActivatorsServer::OnQuickBuildComplete(Entity* self, Entity* target) {	
@@ -37,7 +48,11 @@ void NjRailActivatorsServer::OnQuickBuildComplete(Entity* self, Entity* target) 
 				self->SetVar<bool>(u"NotActive", false);	
 			}	
 		}			
-	}
+	} else if (Game::zoneManager->GetZoneID().GetMapID() >= 2050 
+	&& Game::zoneManager->GetZoneID().GetMapID() <= 2053) {
+		self->SetNetworkVar<bool>(u"NetworkNotActive", false);	
+		self->SetVar<bool>(u"NotActive", false);		
+	}	
 }	
 
 void NjRailActivatorsServer::OnTimerDone(Entity* self, std::string timerName) {
