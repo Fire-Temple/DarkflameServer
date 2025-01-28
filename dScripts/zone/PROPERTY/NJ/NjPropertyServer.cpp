@@ -199,7 +199,9 @@ int32_t param1, int32_t param2) {
 		
 		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2052) {	
 
-		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {			
+		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {	
+
+		}
 	}	
 }	
 
