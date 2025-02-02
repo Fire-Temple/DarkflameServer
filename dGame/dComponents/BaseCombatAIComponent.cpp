@@ -700,8 +700,8 @@ void BaseCombatAIComponent::OnAggro() {
 			// Exclude for bone vultures since well... they fly!	^^^	
 			
 			
-			//	Unrelated stuff -> set garmadon's saved health
-			if (FTExclusiveEnemyLOT == 16810) {
+			//	set fire temple enemy saved health
+			if (Game::zoneManager->GetZoneID().GetMapID() == 2100) {
 				auto* parentEntity = m_MovementAI->GetParent();
 				auto* parentDestroyable = parentEntity->GetComponent<DestroyableComponent>();	
 				

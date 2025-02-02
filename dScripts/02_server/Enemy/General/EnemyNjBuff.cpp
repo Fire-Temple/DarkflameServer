@@ -5,6 +5,9 @@
 #include "BuffComponent.h"
 #include "Loot.h"
 
+#include "dZoneManager.h"
+#include "DestroyableComponent.h"
+
 void EnemyNjBuff::OnStartup(Entity* self) {
 	auto* skillComponent = self->GetComponent<SkillComponent>();
 
@@ -13,19 +16,23 @@ void EnemyNjBuff::OnStartup(Entity* self) {
 	}
 
 	skillComponent->CalculateBehavior(1127, 24812, self->GetObjectID(), true);
-	
-	if (self->GetLOT() == 16810) {
-		self->SetVar<int>(u"CurrentHealth", 775);		
-	}
+
+	if (Game::zoneManager->GetZoneID().GetMapID() == 2100) {
+		auto* destroyableComponent = self->GetComponent<DestroyableComponent>();
+		if (destroyableComponent) {
+			self->SetVar<int>(u"CurrentHealth", destroyableComponent->GetMaxHealth());					
+		}
+	}	
 }
 
 void EnemyNjBuff::OnHitOrHealResult(Entity* self, Entity* attacker, int32_t damage) {
 	
-	if (self->GetLOT() == 16810) {
+	if (Game::zoneManager->GetZoneID().GetMapID() == 2100) {
 		const auto currentHealth = self->GetVar<int>(u"CurrentHealth");
 		
 		self->SetVar<int>(u"CurrentHealth", currentHealth - damage);			
-	} else {		
+	}
+	if (self->GetLOT() != 16810) {	
 		self->SetVar<LWOOBJID>(u"attackerID", attacker->GetObjectID());		
 		
 		auto* missionComponent = attacker->GetComponent<MissionComponent>();
