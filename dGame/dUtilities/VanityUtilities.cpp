@@ -75,6 +75,9 @@ void VanityUtilities::SpawnVanity() {
 	if (Game::config->GetValue("disable_frostburgh") == "0") {
 		ParseXml((BinaryPathFinder::GetBinaryDir() / "vanity/frostburgh_root.xml").string());
 	} 
+	if (Game::config->GetValue("disable_jawbox") == "0") {
+		ParseXml((BinaryPathFinder::GetBinaryDir() / "vanity/jawbox_root.xml").string());
+	} 	
 	
 	
 	// Loop through all objects

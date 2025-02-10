@@ -278,6 +278,7 @@
 #include "NjEarthPetServer.h"
 #include "NjDragonEmblemChestServer.h"
 #include "NjNyaMissionitems.h"
+#include "NjOldManNPC.h"
 
 // Scripted equipment
 #include "AnvilOfArmor.h"
@@ -677,6 +678,8 @@ namespace {
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS.lua", []() {return new NjFireRocks();}},
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS_MANAGER.lua", []() {return new NjFireRocksManager();}},		
 		{"scripts\\02_server\\Map\\General\\L_SIMPLE_MOVER_SWITCH.lua", []() {return new SimpleMoverSwitch();}},	
+		{"scripts\\02_server\\Map\\njhub\\L_OLD_MAN_NPC.lua", []() {return new NjOldManNPC();}},	
+
 
 		//DLU
 		{"scripts\\02_server\\DLU\\DLUVanityTeleportingObject.lua", []() {return new DLUVanityTeleportingObject();}},

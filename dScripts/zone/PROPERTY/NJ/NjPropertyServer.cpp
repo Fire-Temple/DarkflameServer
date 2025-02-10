@@ -11,6 +11,7 @@
 #include "eMissionTaskType.h"
 #include "eMissionState.h"
 
+#include "PossessorComponent.h"
 #include "dZoneManager.h"
 
 void NjPropertyServer::SetGameVariables(Entity* self) {
@@ -73,6 +74,9 @@ void NjPropertyServer::OnPlayerLoaded(Entity* self, Entity* player) {
 	self->SetNetworkVar(PropertyOwnerIDVariable, propertyOwner);
 
 	if (rented) {
+//		tell client script prop is cleared	
+		self->SetNetworkVar<int>(u"cleared", 1);		
+		
 		auto plaques = Game::entityManager->GetEntitiesInGroup("PropertyVendor");
 		for (auto* plaque : plaques) {
 			Game::entityManager->DestructEntity(plaque);
@@ -116,9 +120,15 @@ void NjPropertyServer::OnPlayerLoaded(Entity* self, Entity* player) {
 		self->SetNetworkVar<int>(u"BorderVisible", 0);
 
 		if (!defeatedFlag) {
-//			TODO: set network var for no base music	
-
+//			tell client script prop is not cleared	
+			self->SetNetworkVar<int>(u"cleared", 0);	
+			
 			GameMessages::SendPlayCinematic(player->GetObjectID(), u"ShowOrb", player->GetSystemAddress());
+
+//		remove old rail if present
+			for (auto* rail : Game::entityManager->GetEntitiesInGroup("Rail_Rail")) {		
+				rail->Smash(rail->GetObjectID(), eKillType::SILENT);
+			}
 
 //		orb spawner		
 			for (auto* orbSpawner : Game::zoneManager->GetSpawnersByName("Orb")) {
@@ -135,7 +145,8 @@ void NjPropertyServer::OnPlayerLoaded(Entity* self, Entity* player) {
 //			}			
 	
 		} else {
-//			TODO: set network var for base music on					
+//			tell client script prop is cleared	
+			self->SetNetworkVar<int>(u"cleared", 1);					
 		}
 	}
 }
@@ -201,23 +212,57 @@ LWOOBJID NjPropertyServer::GetOwner() {
 void NjPropertyServer::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, 
 int32_t param1, int32_t param2) {
 	
+	const auto playerID = self->GetVar<LWOOBJID>(PlayerIDVariable);
+	auto* player = Game::entityManager->GetEntity(playerID);	
+
+	NiQuaternion Rot1{};	
+    Rot1.SetW(-0.1f);
+    Rot1.SetX(0.0f);
+    Rot1.SetY(1.0f);
+    Rot1.SetZ(0.0f);	
+	
+	NiQuaternion Rot2{};	
+    Rot2.SetW(0.93f);
+    Rot2.SetX(0.0f);
+    Rot2.SetY(0.37f);
+    Rot2.SetZ(0.0f);	
+	
 	if (name == "RailWasUsed") {
+//		notify client script				
+		self->SetNetworkVar<int>(u"rail_used", 1);
+		
 		if (Game::zoneManager->GetZoneID().GetMapID() == 2050) {
 			self->AddTimer("PlayRailCine", 1.2f);		
 			self->AddTimer("SmashOrb", 3.6f);	
+			GameMessages::SendTeleport(playerID, player->GetPosition(), Rot1, player->GetSystemAddress(), true);
+			
 		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2051) {	
-		
+			self->AddTimer("PlayRailCine", 0.2f);		
+			self->AddTimer("SmashOrb", 2.7f);
+			GameMessages::SendTeleport(playerID, player->GetPosition(), Rot1, player->GetSystemAddress(), true);										
+			GameMessages::SendPlayFXEffect(playerID, 9108, u"create", "ng_ice_tornado_rail");	
+			
 		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2052) {	
-
+			self->AddTimer("PlayRailCine", 0.2f);		
+			self->AddTimer("SmashOrb", 1.5f);
+			GameMessages::SendTeleport(playerID, player->GetPosition(), Rot2, player->GetSystemAddress(), true);				
+			GameMessages::SendPlayFXEffect(playerID, 9107, u"create", "ng_lightning_tornado_rail");	
+			
 		} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {	
-
+			self->AddTimer("PlayRailCine", 0.2f);		
+			self->AddTimer("SmashOrb", 1.7f);
+			GameMessages::SendTeleport(playerID, player->GetPosition(), self->GetRotation(), player->GetSystemAddress(), true);			
+			GameMessages::SendPlayFXEffect(playerID, 9106, u"railloop", "ng_fire_tornado_rail");				
 		}
 	}	
 }	
 
 void NjPropertyServer::OnTimerDone(Entity* self, std::string timerName) {
 	
-	if (timerName == "SmashOrb") {
+	if (timerName == "SmashOrb") {		
+//		notify client script		
+		self->SetNetworkVar<int>(u"orb_smashed", 1);		
+		
 //		Notifies the client that the property has been claimed with a flag, completes missions too
 		const auto playerID = self->GetVar<LWOOBJID>(PlayerIDVariable);
 		auto* player = Game::entityManager->GetEntity(playerID);
@@ -228,12 +273,15 @@ void NjPropertyServer::OnTimerDone(Entity* self, std::string timerName) {
 				GameMessages::SendPlayFXEffect(playerID, 10148, u"create", 
 				"darkitect_portal_onhit_earth");				
 			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2051) {
+				GameMessages::SendStopFXEffect(player, true, "ng_ice_tornado_rail");
 				GameMessages::SendPlayFXEffect(playerID, 10150, u"create", 
 				"darkitect_portal_onhit_ice");					
 			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2052) {
+				GameMessages::SendStopFXEffect(player, true, "ng_lightning_tornado_rail");					
 				GameMessages::SendPlayFXEffect(playerID, 10151, u"create", 
 				"darkitect_portal_onhit_lightning");	
-			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {				
+			} else if (Game::zoneManager->GetZoneID().GetMapID() == 2053) {		
+				GameMessages::SendStopFXEffect(player, true, "ng_fire_tornado_rail");			
 				GameMessages::SendPlayFXEffect(playerID, 10149, u"create", 
 				"darkitect_portal_onhit_fire");				
 			}

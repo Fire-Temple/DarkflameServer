@@ -1,0 +1,17 @@
+<!--nexus jawbox-->
+
+<objects>
+	<object lot="13773">
+		<config>
+			<key>add_to_navmesh=7:1</key>		
+			<key>camGradSnap=7:1</key>	
+			<key>camPrefersToFadeObject=7:0</key>	
+			<key>ignoreCameraCollision=7:0</key>		
+			<key>interaction_distance=3:10</key>		
+			<key>is_smashable=7:0</key>					
+		</config>	
+		<locations>
+			<location zone="1200" x="256.941" y="288.000" z="256.450" rw="-0.383" rx="0.0" ry="0.924" rz="0.0" />
+		</locations>
+	</object>
+</objects>

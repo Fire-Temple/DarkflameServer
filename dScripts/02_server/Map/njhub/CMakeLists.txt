@@ -22,7 +22,8 @@ set(DSCRIPTS_SOURCES_02_SERVER_MAP_NJHUB
 	"NjNyaMissionitems.cpp"
 	"NjScrollChestServer.cpp"
 	"NjWuNPC.cpp"
-	"RainOfArrows.cpp")
+	"RainOfArrows.cpp"
+	"NjOldManNPC.cpp")
 
 add_subdirectory(boss_instance)
 
