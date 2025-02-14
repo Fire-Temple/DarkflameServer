@@ -12,6 +12,7 @@ See the original README for DarkflameUniverse Liscence / Server Information:
 
 #### Client
 You will need the newest client **LEGO Universe 1.11.63 (Unpacked)** << name may change depending on sources
+- Note: there is no official release of LEGO Universe 1.11.63. The name above is a heavily modified version of 1.10.64 with some extra files.
 
 **OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
 You may alternatively get the              
