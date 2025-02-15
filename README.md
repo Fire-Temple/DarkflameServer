@@ -16,7 +16,7 @@ You will need the **LEGO Universe - Unreleased Version (Unpacked)** modded clien
 may or may not be on archive.org
 
 **OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
-You may alternatively get just the modified files             
+You may alternatively get           
 **LEGO Universe - Unreleased Version (Patch)**  <- for a smaller download (optional)
 
 ### Setup
