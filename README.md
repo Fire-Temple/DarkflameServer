@@ -11,11 +11,13 @@ See the original README for DarkflameUniverse Liscence / Server Information:
  - [7zip](https://www.7-zip.org/)
 
 #### Client
-You will need the newest client **LEGO Universe 1.11.63 (Unpacked)** << name may change depending on sources
+You will need the **LEGO Universe - Unreleased Version (Unpacked)** modded client << name may change 
+
+may or may not be on archive.org
 
 **OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
-You may alternatively get the              
-**LEGO Universe 1.11.63 (Patch)** <- for a smaller download (optional)
+You may alternatively get just the modified files             
+**LEGO Universe - Unreleased Version (Patch)**  <- for a smaller download (optional)
 
 ### Setup
 
