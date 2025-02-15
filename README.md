@@ -58,7 +58,7 @@ You may alternatively get
 	and run `MasterServer.exe -a`
 	
 	> with git bash, the command would be: 
-	> `./Masterserver.exe -a`
+	> `./MasterServer.exe -a`
 
 
 * In the server files folder, `worldconfig.ini`	contains some in-game settings you might find useful
@@ -78,8 +78,8 @@ with the exception of the points below:
 * **When requested to run** `git clone --recursive ...`                       
   **Run this instead:** `git clone --recursive https://github.com/fire-temple/DarkflameServer`
   
-* **When using a client, only use** `LEGO Universe 1.11.63 (Unpacked)`                               
-  **OR Get an unpacked client that includes** `LEGO Universe 1.11.63 (Patch)`
+* **When using a client, only use** `LEGO Universe - Unreleased Version (Unpacked)`                               
+  **OR Get an unpacked client that includes** `LEGO Universe - Unreleased Version (Patch)`
 
 <br>
 
