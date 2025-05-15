@@ -60,7 +60,7 @@ void TestSQLDatabase::DeleteUgcModelData(const LWOOBJID& modelId) {
 
 }
 
-void TestSQLDatabase::UpdateUgcModelData(const LWOOBJID& modelId, std::istringstream& lxfml) {
+void TestSQLDatabase::UpdateUgcModelData(const LWOOBJID& modelId, std::stringstream& lxfml) {
 
 }
 
@@ -148,6 +148,10 @@ void TestSQLDatabase::UpdatePropertyDetails(const IProperty::Info& info) {
 
 }
 
+void TestSQLDatabase::UpdateLastSave(const IProperty::Info& info) {
+
+}
+
 void TestSQLDatabase::InsertNewProperty(const IProperty::Info& info, const uint32_t templateId, const LWOZONEID& zoneId) {
 
 }
@@ -164,7 +168,7 @@ void TestSQLDatabase::InsertNewPropertyModel(const LWOOBJID& propertyId, const I
 
 }
 
-void TestSQLDatabase::UpdateModel(const LWOOBJID& propertyId, const NiPoint3& position, const NiQuaternion& rotation, const std::array<std::pair<int32_t, std::string>, 5>& behaviors) {
+void TestSQLDatabase::UpdateModel(const LWOOBJID& modelID, const NiPoint3& position, const NiQuaternion& rotation, const std::array<std::pair<int32_t, std::string>, 5>& behaviors) {
 
 }
 
@@ -184,19 +188,19 @@ void TestSQLDatabase::InsertCheatDetection(const IPlayerCheatDetections::Info& i
 
 }
 
-void TestSQLDatabase::InsertNewMail(const IMail::MailInfo& mail) {
+void TestSQLDatabase::InsertNewMail(const MailInfo& mail) {
 
 }
 
-void TestSQLDatabase::InsertNewUgcModel(std::istringstream& sd0Data, const uint32_t blueprintId, const uint32_t accountId, const uint32_t characterId) {
+void TestSQLDatabase::InsertNewUgcModel(std::stringstream& sd0Data, const uint32_t blueprintId, const uint32_t accountId, const uint32_t characterId) {
 
 }
 
-std::vector<IMail::MailInfo> TestSQLDatabase::GetMailForPlayer(const uint32_t characterId, const uint32_t numberOfMail) {
+std::vector<MailInfo> TestSQLDatabase::GetMailForPlayer(const uint32_t characterId, const uint32_t numberOfMail) {
 	return {};
 }
 
-std::optional<IMail::MailInfo> TestSQLDatabase::GetMail(const uint64_t mailId) {
+std::optional<MailInfo> TestSQLDatabase::GetMail(const uint64_t mailId) {
 	return {};
 }
 
