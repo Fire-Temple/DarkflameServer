@@ -40,6 +40,7 @@
 #include "dChatFilter.h"
 #include "ClientPackets.h"
 #include "CharacterComponent.h"
+#include "ePlayerFlag.h"
 
 #include "EntityManager.h"
 #include "EntityInfo.h"
@@ -805,6 +806,9 @@ void HandlePacket(Packet* packet) {
 				skillComponent->Reset();
 			}
 
+
+			entity->GetCharacter()->SetLastVisitedZoneID(Game::server->GetZoneID());							
+
 			entity->GetCharacter()->SaveXMLToDatabase();
 
 			LOG("Deleting player %llu", entity->GetObjectID());
@@ -1407,6 +1411,9 @@ void WorldShutdownProcess(uint32_t zoneId) {
 			if (skillComponent != nullptr) {
 				skillComponent->Reset();
 			}
+				
+			entity->GetCharacter()->SetLastVisitedZoneID(Game::server->GetZoneID());				
+				
 			LOG("Saving character %s...", entity->GetCharacter()->GetName().c_str());
 			entity->GetCharacter()->SaveXMLToDatabase();
 			LOG("Character data for %s was saved!", entity->GetCharacter()->GetName().c_str());

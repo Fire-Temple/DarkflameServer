@@ -295,16 +295,16 @@ void Entity::Initialize() {
 		if (m_Character) {
 			controllablePhysics->LoadFromXml(m_Character->GetXMLDoc());
 
-			const auto mapID = Game::server->GetZoneID();
-
-			//If we came from another zone, put us in the starting loc
+			const auto mapID = Game::server->GetZoneID();			
+			const auto& targetSceneName = m_Character->GetTargetScene();
+			auto* targetScene = Game::entityManager->GetSpawnPointEntity(targetSceneName);
+			
+			//If we came from another zone, put us in the starting loc					
 			if (m_Character->GetZoneID() != Game::server->GetZoneID() || mapID == 1603) { // Exception for Moon Base as you tend to spawn on the roof.
+
 				NiPoint3 pos;
 				NiQuaternion rot;
-
-				const auto& targetSceneName = m_Character->GetTargetScene();
-				auto* targetScene = Game::entityManager->GetSpawnPointEntity(targetSceneName);
-
+				
 				if (m_Character->HasBeenToWorld(mapID) && targetSceneName.empty()) {
 					pos = m_Character->GetRespawnPoint(mapID);
 					rot = Game::zoneManager->GetZone()->GetSpawnRot();
@@ -317,8 +317,36 @@ void Entity::Initialize() {
 				}
 
 				controllablePhysics->SetPosition(pos);
-				controllablePhysics->SetRotation(rot);
-			}
+				controllablePhysics->SetRotation(rot);		
+			
+			
+//			If we came from a property, try to give us the proper landing orientation	
+			} else if (m_Character->GetLastVisitedZoneType() == "PROPERTY" && m_Character->GetCurrentZoneType() == "WORLD") {
+
+				NiQuaternion rot = controllablePhysics->GetRotation();	
+				NiQuaternion rot180(-rot.y, 0, rot.w, 0);						
+
+				float sqrt2_2 = std::sqrt(2.0f) / 2.0f;	
+				NiQuaternion sqrt2_2rot(sqrt2_2, 0, sqrt2_2, 0);					
+				float rot270W = rot180.w * sqrt2_2rot.w - rot180.x * sqrt2_2rot.x - rot180.y * sqrt2_2rot.y - rot180.z * sqrt2_2rot.z;	
+				float rot270Y = rot180.w * sqrt2_2rot.y - rot180.x * sqrt2_2rot.z + rot180.y * sqrt2_2rot.w + rot180.z * sqrt2_2rot.x;
+				
+				NiQuaternion rot270(rot270W, 0, rot270Y, 0);  		
+				
+				controllablePhysics->SetPosition(m_Character->GetRespawnPoint(mapID));	
+
+
+//				Hardcoding time lol
+				static const std::unordered_set<int> rot180Zones = {1150, 1251, 1351, 1450};	
+				if (rot180Zones.find(m_Character->GetLastVisitedZoneID()) != rot180Zones.end()) {
+					controllablePhysics->SetRotation(rot180);					
+				} else if (m_Character->GetLastVisitedZoneID() == 1250) {
+					controllablePhysics->SetRotation(rot270);		
+				} else {	
+					controllablePhysics->SetRotation(rot);	
+				}					
+			}	
+			
 		} else {
 			controllablePhysics->SetPosition(m_DefaultPosition);
 			controllablePhysics->SetRotation(m_DefaultRotation);

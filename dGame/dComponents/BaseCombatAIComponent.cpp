@@ -692,7 +692,9 @@ void BaseCombatAIComponent::OnAggro() {
 		m_MovementAI->SetDestination(targetPos);
 
 // 	Since firetemple rooms comprised of flat surfaces, lock Y axis movement instead of making a navmesh	
-		if (Game::zoneManager->GetZoneID().GetMapID() == 2100 || Game::zoneManager->GetZoneID().GetMapID() == 2101) {				
+//	Throw medium properties in here too :)
+		if (Game::zoneManager->GetZoneID().GetMapID() == 2100 || Game::zoneManager->GetZoneID().GetMapID() == 2101
+		|| Game::zoneManager->GetZoneID().GetMapID() == 1351 || Game::zoneManager->GetZoneID().GetMapID() == 1451) {				
 			m_MovementAI->SetDestination(targetPos);			
 			if (FTExclusiveEnemyLOT != 13999 && FTExclusiveEnemyLOT != 14000) {		
 				m_MovementAI->SetDestination(FTExclusiveNoYPos);							

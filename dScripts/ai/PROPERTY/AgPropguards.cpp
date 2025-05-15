@@ -51,6 +51,10 @@ int32_t AgPropguards::GetFlagForMission(uint32_t missionID) {
 		return 118;
 	case 1322:
 		return 122;
+	case 32351:
+		return 32351;		
+	case 32451:
+		return 32451;			
 	default:
 		return 0;
 	}

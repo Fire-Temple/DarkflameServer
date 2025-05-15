@@ -168,6 +168,7 @@ bool dpWorld::ShouldUseSP(uint32_t zoneID) {
 	case 1800: // Crux Prime
 	case 1900: // Nexus Tower
 	case 2000: // Ninjago
+	case 2100: // Fire Temple
 		return true;
 	}
 

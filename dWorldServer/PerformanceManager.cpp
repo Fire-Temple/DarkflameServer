@@ -34,18 +34,21 @@ std::map<LWOMAPID, PerformanceProfile> PerformanceManager::m_Profiles = {
 	{ 1204, BATTLE_INSTANCE },
 	{ 1250, PROPERTY },
 	{ 1251, PROPERTY },
+	{ 1260, SOCIAL },	
 
 	// GF
 	{ 1300, BATTLE },
 	{ 1302, BATTLE_INSTANCE },
 	{ 1303, BATTLE_INSTANCE },
 	{ 1350, PROPERTY },
+	{ 1351, PROPERTY },	
 
 	// FV
 	{ 1400, BATTLE },
 	{ 1402, BATTLE_INSTANCE },
 	{ 1403, RACE },
 	{ 1450, PROPERTY },
+	{ 1451, PROPERTY },	
 
 	// LUP
 	{ 1600, SOCIAL },
@@ -66,6 +69,11 @@ std::map<LWOMAPID, PerformanceProfile> PerformanceManager::m_Profiles = {
 	// NJ
 	{ 2000, BATTLE },
 	{ 2001, BATTLE_INSTANCE },
+	{ 2050, PROPERTY },
+	{ 2051, PROPERTY },
+	{ 2052, PROPERTY },
+	{ 2053, PROPERTY },		
+	{ 2100, BATTLE_INSTANCE },	
 };
 
 void PerformanceManager::SelectProfile(LWOMAPID mapID) {

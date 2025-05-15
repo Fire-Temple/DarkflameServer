@@ -210,7 +210,8 @@ file(REMOVE ${PROJECT_BINARY_DIR}/navmeshes.zip)
 
 # Copy vanity files on first build
 set(VANITY_FILES "CREDITS.md" "INFO.md" "TESTAMENT.md" "root.xml" "dev-tribute.xml" "atm.xml" "demo.xml" 
-"frostburgh_root.xml" "frostburgh.xml" "jawbox_root.xml" "jawbox.xml")
+"frostburgh_root.xml" "frostburgh.xml" "jawbox_root.xml" "jawbox.xml" "gfmedprop_root.xml" "gfmedprop.xml"
+"fvmedprop_root.xml" "fvmedprop.xml")
 
 foreach(file ${VANITY_FILES})
 	configure_file("${CMAKE_SOURCE_DIR}/vanity/${file}" "${CMAKE_BINARY_DIR}/vanity/${file}" COPYONLY)

@@ -6,6 +6,7 @@
 #include "tinyxml2.h"
 #include <unordered_map>
 #include <map>
+#include <string>
 
 #include "NiPoint3.h"
 #include "NiQuaternion.h"
@@ -17,6 +18,13 @@ class Entity;
 enum class ePermissionMap : uint64_t;
 enum class eGameMasterLevel : uint8_t;
 enum class eLootSourceType : uint32_t;
+
+enum ZoneType {
+    RACE,
+    PROPERTY,
+    BATTLE,
+    WORLD
+};
 
 /**
  * Meta information about a character, like their name and style
@@ -269,6 +277,18 @@ public:
 	void SetLastNonInstanceZoneID(uint32_t id) { m_LastNonInstanceZoneID = id; }
 
 	/**
+	 * Gets the last zone the character was in, including instanced zones
+	 * @return the zone ID of the last zone this character was in
+	 */
+	uint32_t GetLastVisitedZoneID() const { return m_LastVisitedZoneID; }
+
+	/**
+	 * Sets the last zone ID for the character
+	 * @param id the zone ID
+	 */
+	void SetLastVisitedZoneID(uint32_t id) { m_LastVisitedZoneID = id; }
+
+	/**
 	 * Gets the name of the scene that will play when the character lands in the next zone
 	 * @return the name of the landing scene
 	 */
@@ -453,6 +473,16 @@ public:
 	 * @param isFlying the flying state
 	*/
 	void SetIsFlying(bool isFlying) { m_IsFlying = isFlying; }
+	
+	/**
+	 * Finds zone type of character's current zone
+	*/	
+    std::string GetCurrentZoneType();	
+	
+	/**
+	 * Finds zone type of character's last visited zone
+	*/	
+    std::string GetLastVisitedZoneType();		
 
 	bool GetBillboardVisible() { return m_BillboardVisible; }
 
@@ -463,6 +493,8 @@ public:
 	void _doQuickXMLDataParse() { DoQuickXMLDataParse(); }
 
 	void _setXmlData(const std::string& xmlData) { m_XMLData = xmlData; }
+	
+	
 
 private:
 	void UpdateInfoFromDatabase();
@@ -599,6 +631,11 @@ private:
 	 * The last zone visited by the character that was not an instance zone
 	 */
 	uint32_t m_LastNonInstanceZoneID = 0;
+	
+	/**
+	 * The last zone visited by the character
+	 */
+	uint32_t m_LastVisitedZoneID = 0;	
 
 	/**
 	 * The ID of the zone the character is currently in
@@ -682,6 +719,10 @@ private:
 	 * NOTE: quick as there's no DB lookups
 	 */
 	void DoQuickXMLDataParse();
+	
+	
 };
+
+extern std::map<uint32_t, ZoneType> zoneTypeMap;
 
 #endif // CHARACTER_H

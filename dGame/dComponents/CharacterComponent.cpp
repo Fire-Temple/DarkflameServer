@@ -23,6 +23,7 @@
 #include "ZoneInstanceManager.h"
 #include "WorldPackets.h"
 #include "MessageType/Game.h"
+#include "ePlayerFlag.h"
 #include <ctime>
 
 CharacterComponent::CharacterComponent(Entity* parent, Character* character, const SystemAddress& systemAddress) : Component(parent) {
@@ -106,6 +107,7 @@ bool CharacterComponent::LandingAnimDisabled(int zoneID) {
 	case 1403:
 	case 1603:
 	case 2001:
+	case 2100:	
 		return true;
 
 	default:
@@ -235,6 +237,7 @@ void CharacterComponent::LoadFromXml(const tinyxml2::XMLDocument& doc) {
 		LOG("Failed to find char tag while loading XML!");
 		return;
 	}
+	
 	if (character->QueryAttribute("rpt", &m_Reputation) == tinyxml2::XML_NO_ATTRIBUTE) {
 		SetReputation(0);
 	}
@@ -331,7 +334,7 @@ void CharacterComponent::LoadFromXml(const tinyxml2::XMLDocument& doc) {
 
 	if (!m_Character) return;
 
-	//Check to see if we're landing:
+//	Check to see if we're landing:
 	if (m_Character->GetZoneID() != Game::server->GetZoneID()) {
 		m_IsLanding = true;
 	}
@@ -339,6 +342,18 @@ void CharacterComponent::LoadFromXml(const tinyxml2::XMLDocument& doc) {
 	if (LandingAnimDisabled(m_Character->GetZoneID()) || LandingAnimDisabled(Game::server->GetZoneID()) || m_LastRocketConfig.empty()) {
 		m_IsLanding = false; //Don't make us land on VE/minigames lol
 	}
+	
+//	Check if we're returning from a property	
+	if (m_Character->GetLastVisitedZoneType() == "PROPERTY" && m_Character->GetCurrentZoneType() == "WORLD") {
+		m_IsLanding = true;			
+	}
+	LOG_DEBUG("Character's previous zone type is specified as: %s", m_Character->GetLastVisitedZoneType().c_str());		
+	LOG_DEBUG("Character's current zone type is specified as: %s", m_Character->GetCurrentZoneType().c_str());	
+
+
+//	m_Character->SetIsNewLogin();		
+	
+//	TODO: Remove news popup when returning from instanced zones <- logic is not handled here	
 }
 
 void CharacterComponent::UpdateXml(tinyxml2::XMLDocument& doc) {

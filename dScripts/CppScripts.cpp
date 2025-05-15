@@ -124,6 +124,8 @@
 #include "PirateRep.h"
 #include "GfParrotCrash.h"
 
+#include "ZoneGfPropertyMed.h"
+
 // SG Scripts
 #include "SGCannon.h"
 #include "ZoneSGServer.h"
@@ -506,6 +508,8 @@ namespace {
 		{"scripts\\ai\\GF\\L_GF_MAELSTROM_GEYSER.lua", []() {return new GfMaelstromGeyser();}},
 		{"scripts\\ai\\GF\\L_PIRATE_REP.lua", []() {return new PirateRep();}},
 		{"scripts\\ai\\GF\\L_GF_PARROT_CRASH.lua", []() {return new GfParrotCrash();}},
+		
+		{"scripts\\zone\\PROPERTY\\GF\\L_ZONE_GF_PROPERTY_MEDIUM.lua", []() {return new ZoneGfPropertyMed();}},		
 
 		//SG
 		{"scripts\\ai\\MINIGAME\\SG_GF\\SERVER\\SG_CANNON.lua", []() {return new SGCannon();}},

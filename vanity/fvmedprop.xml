@@ -1,0 +1,19 @@
+<!--forbidden valley to medium property-->
+
+<objects>
+	<object lot="12442">
+		<config>
+			<key>add_to_navmesh=7:1</key>	
+			<key>camGradSnap=7:1</key>	
+			<key>camPrefersToFadeObject=7:1</key>	
+			<key>ignoreCameraCollision=7:0</key>			
+			<key>is_smashable=7:0</key>	
+			<key>launchCamera=0:FrostLaunchCam</key>	
+			<key>playSummary=7:0</key>				
+			<key>transferZoneID=0:1260</key>			
+		</config>
+		<locations>
+			<location zone="99996" x="268.810" y="1183.190" z="-297.199" rw="0.951" rx="0.0" ry="0.309" rz="0.0" />
+		</locations>
+	</object>
+</objects>

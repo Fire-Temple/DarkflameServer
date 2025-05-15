@@ -161,6 +161,12 @@ void Character::DoQuickXMLDataParse() {
 			character->QueryAttribute("lnzid", &lastNonInstanceZoneID);
 			m_LastNonInstanceZoneID = lastNonInstanceZoneID;
 		}
+		
+		if (character->FindAttribute("lvzid")) {
+			uint32_t lastVisitedZoneID = 0;
+			character->QueryAttribute("lvzid", &lastVisitedZoneID);
+			m_LastVisitedZoneID = lastVisitedZoneID;
+		}		
 
 		if (character->FindAttribute("tscene")) {
 			const char* tscene = nullptr;
@@ -248,18 +254,21 @@ void Character::SaveXMLToDatabase() {
 
 		auto zoneInfo = Game::zoneManager->GetZone()->GetZoneID();
 		// lzid garbage, binary concat of zoneID, zoneInstance and zoneClone
-		if (zoneInfo.GetMapID() != 0 && zoneInfo.GetCloneID() == 0 && !Game::zoneManager->GetDisableSaveLocation()) {
-			uint64_t lzidConcat = zoneInfo.GetCloneID();
-			lzidConcat = (lzidConcat << 16) | uint16_t(zoneInfo.GetInstanceID());
-			lzidConcat = (lzidConcat << 16) | uint16_t(zoneInfo.GetMapID());
-			character->SetAttribute("lzid", lzidConcat);
-			character->SetAttribute("lnzid", GetLastNonInstanceZoneID());
+		if (zoneInfo.GetMapID() != 0) { 
+			if (zoneInfo.GetCloneID() == 0 && !Game::zoneManager->GetDisableSaveLocation()) {
+				uint64_t lzidConcat = zoneInfo.GetCloneID();
+				lzidConcat = (lzidConcat << 16) | uint16_t(zoneInfo.GetInstanceID());
+				lzidConcat = (lzidConcat << 16) | uint16_t(zoneInfo.GetMapID());
+				character->SetAttribute("lzid", lzidConcat);
+				character->SetAttribute("lnzid", GetLastNonInstanceZoneID());
 
-			//Darwin's backup:
-			character->SetAttribute("lwid", Game::server->GetZoneID());
+				//Darwin's backup:
+				character->SetAttribute("lwid", Game::server->GetZoneID());
 
-			// Set the target scene, custom attribute
-			character->SetAttribute("tscene", m_TargetScene.c_str());
+				// Set the target scene, custom attribute
+				character->SetAttribute("tscene", m_TargetScene.c_str());
+			}
+			character->SetAttribute("lvzid", GetLastVisitedZoneID());			
 		}
 
 		auto emotes = character->FirstChildElement("ue");
@@ -565,3 +574,77 @@ void Character::SetBillboardVisible(bool visible) {
 	// Now turn off the billboard for the owner.
 	GameMessages::SendSetNamebillboardState(m_OurEntity->GetSystemAddress(), m_OurEntity->GetObjectID());
 }
+
+std::string Character::GetCurrentZoneType() {
+    // Check if the m_ZoneID exists in the map
+    auto find = zoneTypeMap.find(m_ZoneID);
+    if (find != zoneTypeMap.end()) {
+        // If the zone ID is found, return the corresponding zone type as a string.
+        switch (find->second) {
+            case RACE: return "RACE";
+            case PROPERTY: return "PROPERTY";			
+            case BATTLE: return "BATTLE";			
+            default: return "WORLD";
+        }
+    } else {
+//		default zoneType to WORLD
+        return "WORLD";
+    }
+}
+
+std::string Character::GetLastVisitedZoneType() {
+    // Check if the m_ZoneID exists in the map
+    auto find = zoneTypeMap.find(m_LastVisitedZoneID);
+    if (find != zoneTypeMap.end()) {
+        // If the zone ID is found, return the corresponding zone type as a string.
+        switch (find->second) {
+            case RACE: return "RACE";
+            case PROPERTY: return "PROPERTY";			
+            case BATTLE: return "BATTLE";			
+            default: return "WORLD";
+        }
+    } else {
+//		default zoneType to WORLD
+        return "WORLD";
+    }
+}
+
+std::map<uint32_t, ZoneType> zoneTypeMap = {
+
+///	!!IMPORTANT!! ///
+
+//	For all instanced zones, specify zone type
+//	Non-specified worlds will default as zoneType: WORLD	
+	
+//	Racing	
+    {1203, RACE},
+    {1261, RACE},	
+    {1303, RACE},	
+    {1403, RACE},	
+
+//	Properties
+    {1150, PROPERTY},
+    {1151, PROPERTY},
+    {1250, PROPERTY},
+    {1251, PROPERTY},	
+    {1350, PROPERTY},
+    {1351, PROPERTY},		
+    {1450, PROPERTY},
+    {1451, PROPERTY},	
+    {2050, PROPERTY},
+    {2051, PROPERTY},		
+    {2052, PROPERTY},
+    {2053, PROPERTY},	
+	
+//	Battle Instances	
+    {1101, BATTLE},
+    {1102, BATTLE},
+    {1204, BATTLE},	
+    {1302, BATTLE},
+    {1303, BATTLE},	
+    {1402, BATTLE},	
+    {2001, BATTLE},
+    {2100, BATTLE}	
+	
+
+};
