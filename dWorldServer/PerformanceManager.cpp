@@ -38,12 +38,14 @@ namespace {
 		{ 1302, BATTLE_INSTANCE },
 		{ 1303, BATTLE_INSTANCE },
 		{ 1350, PROPERTY },
+		{ 1351, PROPERTY },	
 
 		// FV
 		{ 1400, BATTLE },
 		{ 1402, BATTLE_INSTANCE },
 		{ 1403, RACE },
 		{ 1450, PROPERTY },
+		{ 1451, PROPERTY },	
 
 		// LUP
 		{ 1600, SOCIAL },
@@ -64,6 +66,11 @@ namespace {
 		// NJ
 		{ 2000, BATTLE },
 		{ 2001, BATTLE_INSTANCE },
+		{ 2050, PROPERTY },
+		{ 2051, PROPERTY },
+		{ 2052, PROPERTY },
+		{ 2053, PROPERTY },		
+		{ 2100, BATTLE_INSTANCE },	
 	};
 };
 

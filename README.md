@@ -11,13 +11,11 @@ See the original README for DarkflameUniverse Liscence / Server Information:
  - [7zip](https://www.7-zip.org/)
 
 #### Client
-You will need the **LEGO Universe - Unreleased Version (Unpacked)** modded client << name may change 
-
-may or may not be on archive.org
+You will need the newest client **LEGO Universe 1.11.63 (Unpacked)** << name may change depending on sources
 
 **OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
-You may alternatively get           
-**LEGO Universe - Unreleased Version (Patch)**  <- for a smaller download (optional)
+You may alternatively get the              
+**LEGO Universe 1.11.63 (Patch)** <- for a smaller download (optional)
 
 ### Setup
 
@@ -58,7 +56,7 @@ You may alternatively get
 	and run `MasterServer.exe -a`
 	
 	> with git bash, the command would be: 
-	> `./MasterServer.exe -a`
+	> `./Masterserver.exe -a`
 
 
 * In the server files folder, `worldconfig.ini`	contains some in-game settings you might find useful
@@ -78,8 +76,8 @@ with the exception of the points below:
 * **When requested to run** `git clone --recursive ...`                       
   **Run this instead:** `git clone --recursive https://github.com/fire-temple/DarkflameServer`
   
-* **When using a client, only use** `LEGO Universe - Unreleased Version (Unpacked)`                               
-  **OR Get an unpacked client that includes** `LEGO Universe - Unreleased Version (Patch)`
+* **When using a client, only use** `LEGO Universe 1.11.63 (Unpacked)`                               
+  **OR Get an unpacked client that includes** `LEGO Universe 1.11.63 (Patch)`
 
 <br>
 
