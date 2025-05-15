@@ -78,7 +78,12 @@ void VanityUtilities::SpawnVanity() {
 	if (Game::config->GetValue("disable_jawbox") == "0") {
 		ParseXml((BinaryPathFinder::GetBinaryDir() / "vanity/jawbox_root.xml").string());
 	} 	
-	
+	if (Game::config->GetValue("gf_property_medium") == "1") {
+		ParseXml((BinaryPathFinder::GetBinaryDir() / "vanity/gfmedprop_root.xml").string());
+	} 		
+	if (Game::config->GetValue("fv_property_medium") == "1") {
+		ParseXml((BinaryPathFinder::GetBinaryDir() / "vanity/fvmedprop_root.xml").string());
+	} 		
 	
 	// Loop through all objects
 	for (auto& object : objects) {
