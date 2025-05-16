@@ -941,6 +941,15 @@ namespace DEVGMCommands {
 		LOG("<location x=\"%f\" y=\"%f\" z=\"%f\" rw=\"%f\" rx=\"%f\" ry=\"%f\" rz=\"%f\" />", position.x, position.y, position.z, rotation.w, rotation.x, rotation.y, rotation.z);
 	}
 
+	void PlayCinematic(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
+		const auto splitArgs = GeneralUtils::SplitString(args, ' ');
+		if (splitArgs.empty()) return;
+		
+		GameMessages::SendPlayCinematic(entity->GetObjectID(), GeneralUtils::UTF8ToUTF16(splitArgs[0], splitArgs[0].size()), entity->GetSystemAddress());		
+
+		LOG("Playing cinematic...");
+	}
+
 	void PlayLvlFx(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
 		GameMessages::SendPlayFXEffect(entity, 7074, u"create", "7074", LWOOBJID_EMPTY, 1.0f, 1.0f, true);
 	}

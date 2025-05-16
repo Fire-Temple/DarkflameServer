@@ -41,6 +41,7 @@ namespace DEVGMCommands {
 	void Lookup(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void PlayAnimation(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void PlayEffect(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void PlayCinematic(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void PlayLvlFx(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void PlayRebuildFx(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Pos(Entity* entity, const SystemAddress& sysAddr, const std::string args);

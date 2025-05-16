@@ -518,7 +518,15 @@ void SlashCommandHandler::Startup() {
 		.handle = DEVGMCommands::PlayEffect,
 		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
-	RegisterCommand(PlayEffectCommand);
+	
+	Command PlayCinematicCommand{
+		.help = "Plays a cinematic",
+		.info = "Plays a cinematic",
+		.aliases = { "playcinematic" },
+		.handle = DEVGMCommands::PlayCinematic,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(PlayCinematicCommand);
 
 	Command PlayLvlFxCommand{
 		.help = "Plays the level up animation on your character",
