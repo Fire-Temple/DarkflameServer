@@ -340,7 +340,7 @@ void Entity::Initialize() {
 				static const std::unordered_set<int> rot180Zones = {1150, 1251, 1351, 1450};	
 				if (rot180Zones.find(m_Character->GetLastVisitedZoneID()) != rot180Zones.end()) {
 					controllablePhysics->SetRotation(rot180);					
-				} else if (m_Character->GetLastVisitedZoneID() == 1250) {
+				} else if (m_Character->GetLastVisitedZoneID() == 1250 || 1451) {
 					controllablePhysics->SetRotation(rot270);		
 				} else {	
 					controllablePhysics->SetRotation(rot);	

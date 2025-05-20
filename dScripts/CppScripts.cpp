@@ -163,6 +163,8 @@
 #include "RaceFireballs.h"
 #include "RaceShipLapColumnsServer.h"
 
+#include "ZoneFvPropertyMed.h"
+
 // FB Scripts
 #include "AgJetEffectServer.h"
 #include "AgSalutingNpcs.h"
@@ -557,6 +559,9 @@ namespace {
 		{"scripts\\02_server\\Map\\FV\\L_NPC_FONG.lua", []() {return new FvFong();}},
 		{"scripts\\ai\\FV\\L_FV_MAELSTROM_GEYSER.lua", []() {return new FvMaelstromGeyser();}},
 		{"scripts\\02_server\\Map\\FV\\Racing\\RACE_SHIP_LAP_COLUMNS_SERVER.lua", []() {return new RaceShipLapColumnsServer();}},
+		
+		{"scripts\\zone\\PROPERTY\\FV\\L_ZONE_FV_PROPERTY_MEDIUM.lua", []() {return new ZoneFvPropertyMed();}},		
+
 
 		//yes we know the lap numbers dont match the file name or anim. Thats what they desgined it as.
 		{"scripts\\ai\\RACING\\OBJECTS\\FV_RACE_DRAGON_LAP1_SERVER.lua", []() {return new FvRaceDragon("lap_01", 2);}},
