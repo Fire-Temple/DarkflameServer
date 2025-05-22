@@ -11,11 +11,11 @@ See the original README for DarkflameUniverse Liscence / Server Information:
  - [7zip](https://www.7-zip.org/)
 
 #### Client
-You will need the newest client **LEGO Universe 1.11.63 (Unpacked)** << name may change depending on sources
+You will need the newest client **LEGO Universe 1.11 (Unpacked)** << name may change depending on sources
 
 **OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
 You may alternatively get the              
-**LEGO Universe 1.11.63 (Patch)** <- for a smaller download (optional)
+**LEGO Universe 1.11 (Patch)** <- for a smaller download (optional)
 
 ### Setup
 
@@ -76,8 +76,8 @@ with the exception of the points below:
 * **When requested to run** `git clone --recursive ...`                       
   **Run this instead:** `git clone --recursive https://github.com/fire-temple/DarkflameServer`
   
-* **When using a client, only use** `LEGO Universe 1.11.63 (Unpacked)`                               
-  **OR Get an unpacked client that includes** `LEGO Universe 1.11.63 (Patch)`
+* **When using a client, only use** `LEGO Universe 1.11 (Unpacked)`                               
+  **OR Get an unpacked client that includes** `LEGO Universe 1.11 (Patch)`
 
 <br>
 
