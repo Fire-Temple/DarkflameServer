@@ -1,19 +1,28 @@
 <!--forbidden valley to medium property-->
 
 <objects>
-	<object lot="12442">
+	<object lot="32492">
 		<config>
+			<key>CheckPrecondition=0:32874</key>
 			<key>add_to_navmesh=7:1</key>	
 			<key>camGradSnap=7:1</key>	
 			<key>camPrefersToFadeObject=7:1</key>	
 			<key>ignoreCameraCollision=7:0</key>			
 			<key>is_smashable=7:0</key>	
-			<key>launchCamera=0:FrostLaunchCam</key>	
-			<key>playSummary=7:0</key>				
-			<key>transferZoneID=0:1260</key>			
+			<key>launchCamera=0:FVExitCam3</key>	
+			<key>mapID=1:1451</key>
+			<key>playSummary=7:0</key>	
+			<key>propertyDefaultTargetZone=1:0</key>
+			<key>propertyLaunchPadOnPropertyMap=7:0</key>
+			<key>propertyName=0:FVMedProperty</key>
+			<key>rocketLaunchPreCondition=0:32874</key>
+			<key>rocketLaunchUseDBDefaults=7:1</key>
+			<key>rocketUseLaunchPrecondition=7:1</key>
+			<key>targetScene=0:</key>
+			<key>targetZone=1:1451</key>
 		</config>
 		<locations>
-			<location zone="99996" x="268.810" y="1183.190" z="-297.199" rw="0.951" rx="0.0" ry="0.309" rz="0.0" />
+			<location zone="1400" x="-196.13" y="270.333" z="-51.13" rw="0.100711" rx="-0.025" ry="0.994916" rz="0" />
 		</locations>
 	</object>
 </objects>
