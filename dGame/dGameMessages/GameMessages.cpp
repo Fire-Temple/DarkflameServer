@@ -4985,7 +4985,7 @@ void GameMessages::HandleQuickBuildCancel(RakNet::BitStream& inStream, Entity* e
 }
 
 void GameMessages::HandlePlayEmote(RakNet::BitStream& inStream, Entity* entity) {
-	int emoteID;
+	int32_t emoteID;
 	LWOOBJID targetID;
 
 	inStream.Read(emoteID);
@@ -5004,7 +5004,11 @@ void GameMessages::HandlePlayEmote(RakNet::BitStream& inStream, Entity* entity) 
 		if (emote) sAnimationName = emote->animationName;
 	}
 
-	RenderComponent::PlayAnimation(entity, sAnimationName);
+	GameMessages::EmotePlayed msg;
+	msg.target = entity->GetObjectID();
+	msg.emoteID = emoteID;
+	msg.targetID = targetID;      // The emote’s target entity or 0 if none
+	msg.Send(UNASSIGNED_SYSTEM_ADDRESS);  // Broadcast to all clients
 
 	MissionComponent* missionComponent = entity->GetComponent<MissionComponent>();
 	if (!missionComponent) return;
@@ -5225,7 +5229,7 @@ void GameMessages::HandlePickupCurrency(RakNet::BitStream& inStream, Entity* ent
 	if (currency == 0) return;
 
 	auto* ch = entity->GetCharacter();
-	if (entity->CanPickupCoins(currency)) {
+	if (ch && entity->CanPickupCoins(currency)) {
 		ch->SetCoins(ch->GetCoins() + currency, eLootSourceType::PICKUP);
 	}
 }
@@ -6490,5 +6494,10 @@ namespace GameMessages {
 	void PlayBehaviorSound::Serialize(RakNet::BitStream& stream) const {
 		stream.Write(soundID != -1);
 		if (soundID != -1) stream.Write(soundID);
+	}
+
+	void EmotePlayed::Serialize(RakNet::BitStream& stream) const {
+		stream.Write(emoteID);
+		stream.Write(targetID);
 	}
 }

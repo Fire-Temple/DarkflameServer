@@ -272,6 +272,10 @@ void PropertyManagementComponent::OnStartBuilding() {
 			model->HandleMsg(reset);
 		}
 	}
+
+	for (auto* const entity : Game::entityManager->GetEntitiesInGroup("SpawnedPropertyEnemies")) {
+		if (entity) entity->Smash();
+	}
 }
 
 void PropertyManagementComponent::OnFinishBuilding() {
@@ -295,6 +299,10 @@ void PropertyManagementComponent::OnFinishBuilding() {
 			reset.target = modelID;
 			model->HandleMsg(reset);
 		}
+	}
+
+	for (auto* const entity : Game::entityManager->GetEntitiesInGroup("SpawnedPropertyEnemies")) {
+		if (entity) entity->Smash();
 	}
 }
 
@@ -696,8 +704,9 @@ void PropertyManagementComponent::Save() {
 			Database::Get()->AddBehavior(info);
 		}
 
-		const auto position = entity->GetPosition();
-		const auto rotation = entity->GetRotation();
+		// Always save the original position so we can move the model freely
+		const auto& position = modelComponent->GetOriginalPosition();
+		const auto& rotation = modelComponent->GetOriginalRotation();
 
 		if (std::find(present.begin(), present.end(), id) == present.end()) {
 			IPropertyContents::Model model;

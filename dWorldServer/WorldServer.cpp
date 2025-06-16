@@ -714,12 +714,12 @@ void HandleMasterPacket(Packet* packet) {
 			//Create our user and send them in:
 			UserManager::Instance()->CreateUser(it->second.sysAddr, username.GetAsString(), userHash);
 
-			auto zone = Game::zoneManager->GetZone();
-			if (zone) {
+			if (Game::zoneManager->HasZone()) {
 				float x = 0.0f;
 				float y = 0.0f;
 				float z = 0.0f;
 
+				auto zone = Game::zoneManager->GetZone();
 				if (zone->GetZoneID().GetMapID() == 1100) {
 					auto pos = zone->GetSpawnPos();
 					x = pos.x;
@@ -1049,7 +1049,7 @@ void HandlePacket(Packet* packet) {
 
 				const auto respawnPoint = player->GetCharacter()->GetRespawnPoint(Game::zoneManager->GetZone()->GetWorldID());
 
-				Game::entityManager->ConstructEntity(player, UNASSIGNED_SYSTEM_ADDRESS, true);
+				Game::entityManager->ConstructEntity(player, UNASSIGNED_SYSTEM_ADDRESS);
 
 				if (respawnPoint != NiPoint3Constant::ZERO) {
 					GameMessages::SendPlayerReachedRespawnCheckpoint(player, respawnPoint, NiQuaternionConstant::IDENTITY);
