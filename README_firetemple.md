@@ -1,4 +1,4 @@
-# <img style="float: left; padding-right: 5px" height=35px width=35px src="logo.png"> Darkflame Universe
+# <img style="float: left; padding-right: 5px" height=35px width=35px src="logo_.png"> Darkflame Universe
 
 See the original README for DarkflameUniverse Liscence / Server Information:                       
 [Darkflame Universe README](https://github.com/Fire-Temple/DarkflameServer/blob/main/README_original.md)
