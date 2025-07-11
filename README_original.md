@@ -1,4 +1,4 @@
-# <img style="float: left; padding-right: 5px" height=35px width=35px src="logo.png"> Darkflame Universe
+# <img style="float: left; padding-right: 5px" height=35px width=35px src="logo_.png"> Darkflame Universe
 
 ## Introduction
 Darkflame Universe (DLU) is a server emulator for LEGO® Universe. Development started in 2013 and has gone through multiple iterations and is now able to present a near perfect emulation of the game server.
