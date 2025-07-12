@@ -39,6 +39,7 @@
 #include "CDPropertyTemplateTable.h"
 #include "CDFeatureGatingTable.h"
 #include "CDRailActivatorComponent.h"
+#include "CDMapFacesAndHairTable.h"
 #include "CDRewardCodesTable.h"
 #include "CDPetComponentTable.h"
 
@@ -102,6 +103,7 @@ DEFINE_TABLE_STORAGE(CDScriptComponentTable);
 DEFINE_TABLE_STORAGE(CDSkillBehaviorTable);
 DEFINE_TABLE_STORAGE(CDTamingBuildPuzzleTable);
 DEFINE_TABLE_STORAGE(CDVendorComponentTable);
+DEFINE_TABLE_STORAGE(CDMapFacesAndHairTable);
 
 void CDClientManager::LoadValuesFromDatabase() {
 	if (!CDClientDatabase::isConnected) {
@@ -124,6 +126,7 @@ void CDClientManager::LoadValuesFromDatabase() {
 	CDItemSetSkillsTable::Instance().LoadValuesFromDatabase();
 	CDItemSetsTable::Instance().LoadValuesFromDatabase();
 	CDLevelProgressionLookupTable::Instance().LoadValuesFromDatabase();
+	CDMapFacesAndHairTable::Instance().LoadValuesFromDatabase();
 	CDCLIENT_DONT_CACHE_TABLE(CDLootMatrixTable::Instance().LoadValuesFromDatabase());
 	CDCLIENT_DONT_CACHE_TABLE(CDLootTableTable::Instance().LoadValuesFromDatabase());
 	CDMissionEmailTable::Instance().LoadValuesFromDatabase();
