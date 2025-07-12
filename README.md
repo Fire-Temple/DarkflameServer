@@ -17,6 +17,8 @@ You will need the newest client **LEGO Universe - Unreleased Version (Unpacked)*
 You may alternatively get the              
 **LEGO Universe - Unreleased Version (Patch)** <- for a smaller download (optional)
 
+	> Clients may or may not be on Archive.org
+
 ### Setup
 
 1. Download the latest release for your operating system here: 

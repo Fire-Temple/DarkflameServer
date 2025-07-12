@@ -80,7 +80,7 @@ void EnemyNjBuff::RunDieCallback(Entity* self) {
 			if (std::find(enemies[i].begin(), enemies[i].end(), myLOT) != enemies[i].end()) {
 				auto& lootTable = lootTablesByDifficulty[i];
 				if (lootTable.find(ElementType) != lootTable.end()) {
-					Loot::DropLoot(killer, self, lootTable[ElementType], 0, 0);
+					Loot::DropLoot(killer, self->GetObjectID(), lootTable[ElementType], 0, 0);
 				}
 				break;
 			}

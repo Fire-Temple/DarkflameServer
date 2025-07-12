@@ -89,16 +89,16 @@ void BaseInteractDropLootChest::BaseUse(Entity* self, Entity* user) {
 	}
 
 	if (self->GetLOT() != 16842) {
-		Loot::DropLoot(user, self, lootMatrix, 0, 0);
+		Loot::DropLoot(user, self->GetObjectID(), lootMatrix, 0, 0);
 	} else {
 		auto team = TeamManager::Instance()->GetTeam(user->GetObjectID());
 		if (team != nullptr) { 		
 			for (auto memberID : team->members) {
 				auto* memberEntity = Game::entityManager->GetEntity(memberID);
-				Loot::DropLoot(memberEntity, self, lootMatrix, 0, 0);
+				Loot::DropLoot(memberEntity, self->GetObjectID(), lootMatrix, 0, 0);
 			}		
 		} else {
-			Loot::DropLoot(user, self, lootMatrix, 0, 0);
+			Loot::DropLoot(user, self->GetObjectID(), lootMatrix, 0, 0);
 		}	
 	}
 	
@@ -111,12 +111,12 @@ void BaseInteractDropLootChest::BaseUse(Entity* self, Entity* user) {
 void BaseInteractDropLootChest::PostTokenUse(Entity* self, Entity* user) {		
 		
 	if (self->GetLOT() == 16837) {
-		Loot::DropLoot(user, self, 32867, 0, 0);
+		Loot::DropLoot(user, self->GetObjectID(), 32867, 0, 0);
 	} else if (self->GetLOT() == 16841) {
-		Loot::DropLoot(user, self, 32868, 0, 0);
+		Loot::DropLoot(user, self->GetObjectID(), 32868, 0, 0);
 	} else if (self->GetLOT() == 16839) {
-		Loot::DropLoot(user, self, 32869, 0, 0);
+		Loot::DropLoot(user, self->GetObjectID(), 32869, 0, 0);
 	} else if (self->GetLOT() == 16838) {
-		Loot::DropLoot(user, self, 32870, 0, 0);
+		Loot::DropLoot(user, self->GetObjectID(), 32870, 0, 0);
 	}	
 }
