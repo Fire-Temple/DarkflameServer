@@ -273,6 +273,17 @@ Instance* InstanceManager::FindInstance(LWOMAPID mapID, LWOINSTANCEID instanceID
 	return nullptr;
 }
 
+std::vector<Instance*> InstanceManager::FindInstancesByMapID(LWOMAPID mapID) {
+	std::vector<Instance*> instances;
+	for (Instance* instance : m_Instances) {
+		if (instance && instance->GetMapID() == mapID) {
+			instances.push_back(instance);
+		}
+	}
+
+	return instances;
+}
+
 Instance* InstanceManager::FindInstanceWithPrivate(LWOMAPID mapID, LWOINSTANCEID instanceID) {
 	for (Instance* i : m_Instances) {
 		if (i && i->GetMapID() == mapID && i->GetInstanceID() == instanceID && !i->GetShutdownComplete() && !i->GetIsShuttingDown()) {
