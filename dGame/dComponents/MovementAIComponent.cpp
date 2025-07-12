@@ -14,6 +14,7 @@
 #include "dZoneManager.h"
 
 #include "CDComponentsRegistryTable.h"
+#include "QuickBuildComponent.h"
 #include "CDPhysicsComponentTable.h"
 
 #include "dNavMesh.h"
@@ -88,6 +89,9 @@ void MovementAIComponent::Resume() {
 
 void MovementAIComponent::Update(const float deltaTime) {
 	if (m_Paused) return;
+
+	auto* const quickBuildComponent = m_Parent->GetComponent<QuickBuildComponent>();
+	if (quickBuildComponent && quickBuildComponent->GetState() != eQuickBuildState::COMPLETED) return;
 
 	if (m_PullingToPoint) {
 		const auto source = GetCurrentWaypoint();
@@ -172,10 +176,11 @@ void MovementAIComponent::Update(const float deltaTime) {
 				return;
 			}
 		}
-		SetDestination(m_CurrentPath.top().position);
+		} else {
+			SetDestination(m_CurrentPath.top().position);
 
-		m_CurrentPath.pop();
-	}
+			m_CurrentPath.pop();
+		}
 
 	Game::entityManager->SerializeEntity(m_Parent);
 }
