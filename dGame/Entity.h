@@ -226,6 +226,7 @@ public:
 	void OnZonePropertyModelRemoved(Entity* player);
 	void OnZonePropertyModelRemovedWhileEquipped(Entity* player);
 	void OnZonePropertyModelRotated(Entity* player);
+	void OnObjectLoaded(LWOOBJID object, LOT templateId);
 	void OnActivityNotify(GameMessages::ActivityNotify& notify);
 	void OnShootingGalleryFire(GameMessages::ShootingGalleryFire& notify);
 	void OnChildLoaded(GameMessages::ChildLoaded& childLoaded);
