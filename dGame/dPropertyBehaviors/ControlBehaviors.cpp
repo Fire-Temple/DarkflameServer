@@ -30,22 +30,27 @@
 #include "SplitStripMessage.h"
 #include "UpdateActionMessage.h"
 #include "UpdateStripUiMessage.h"
+#include "eObjectBits.h"
 
 void ControlBehaviors::RequestUpdatedID(ControlBehaviorContext& context) {
+	BehaviorMessageBase msgBase{ context.arguments };
+	const auto oldBehaviorID = msgBase.GetBehaviorId();
 	ObjectIDManager::RequestPersistentID(
-		[context](uint32_t persistentId) {
+		[context, oldBehaviorID](uint32_t persistentId) {
 			if (!context) {
 				LOG("Model to update behavior ID for is null. Cannot update ID.");
 				return;
 			}
+			LWOOBJID persistentIdBig = persistentId;
+			GeneralUtils::SetBit(persistentIdBig, eObjectBits::CHARACTER);
 			// This updates the behavior ID of the behavior should this be a new behavior
 			AMFArrayValue args;
 
-			args.Insert("behaviorID", std::to_string(persistentId));
+			args.Insert("behaviorID", std::to_string(persistentIdBig));
 			args.Insert("objectID", std::to_string(context.modelComponent->GetParent()->GetObjectID()));
 
 			GameMessages::SendUIMessageServerToSingleClient(context.modelOwner, context.modelOwner->GetSystemAddress(), "UpdateBehaviorID", args);
-			context.modelComponent->UpdatePendingBehaviorId(persistentId);
+			context.modelComponent->UpdatePendingBehaviorId(persistentIdBig, oldBehaviorID);
 
 			ControlBehaviors::Instance().SendBehaviorListToClient(context);
 		});
@@ -102,9 +107,12 @@ void ControlBehaviors::ProcessCommand(Entity* const modelEntity, const AMFArrayV
 	if (!modelComponent) return;
 
 	ControlBehaviorContext context{ arguments, modelComponent, modelOwner };
+	bool needsNewBehaviorID = false;
 
 	if (command == "sendBehaviorListToClient") {
 		SendBehaviorListToClient(context);
+	} else if (command == "sendBehaviorBlocksToClient") {
+		SendBehaviorBlocksToClient(context);
 	} else if (command == "modelTypeChanged") {
 		const auto* const modelType = arguments.Get<double>("ModelType");
 		if (!modelType) return;
@@ -113,52 +121,54 @@ void ControlBehaviors::ProcessCommand(Entity* const modelEntity, const AMFArrayV
 	} else if (command == "toggleExecutionUpdates") {
 		// TODO
 	} else if (command == "addStrip") {
-		if (BehaviorMessageBase(context.arguments).IsDefaultBehaviorId()) RequestUpdatedID(context);
-
-		context.modelComponent->HandleControlBehaviorsMsg<AddStripMessage>(context.arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<AddStripMessage>(context.arguments);
 	} else if (command == "removeStrip") {
-		context.modelComponent->HandleControlBehaviorsMsg<RemoveStripMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<RemoveStripMessage>(arguments);
 	} else if (command == "mergeStrips") {
-		context.modelComponent->HandleControlBehaviorsMsg<MergeStripsMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<MergeStripsMessage>(arguments);
 	} else if (command == "splitStrip") {
-		context.modelComponent->HandleControlBehaviorsMsg<SplitStripMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<SplitStripMessage>(arguments);
 	} else if (command == "updateStripUI") {
-		context.modelComponent->HandleControlBehaviorsMsg<UpdateStripUiMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<UpdateStripUiMessage>(arguments);
 	} else if (command == "addAction") {
-		context.modelComponent->HandleControlBehaviorsMsg<AddActionMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<AddActionMessage>(arguments);
 	} else if (command == "migrateActions") {
-		context.modelComponent->HandleControlBehaviorsMsg<MigrateActionsMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<MigrateActionsMessage>(arguments);
 	} else if (command == "rearrangeStrip") {
-		context.modelComponent->HandleControlBehaviorsMsg<RearrangeStripMessage>(arguments);
-	} else if (command == "add") {
-		AddMessage msg{ context.arguments };
-		context.modelComponent->AddBehavior(msg);
-		SendBehaviorListToClient(context);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<RearrangeStripMessage>(arguments);
 	} else if (command == "removeActions") {
-		context.modelComponent->HandleControlBehaviorsMsg<RemoveActionsMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<RemoveActionsMessage>(arguments);
+	} else if (command == "updateAction") {
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<UpdateActionMessage>(arguments);
 	} else if (command == "rename") {
-		context.modelComponent->HandleControlBehaviorsMsg<RenameMessage>(arguments);
+		needsNewBehaviorID = context.modelComponent->HandleControlBehaviorsMsg<RenameMessage>(arguments);
 
 		// Send the list back to the client so the name is updated.
 		SendBehaviorListToClient(context);
-	} else if (command == "sendBehaviorBlocksToClient") {
-		SendBehaviorBlocksToClient(context);
-	} else if (command == "moveToInventory") {
-		MoveToInventoryMessage msg{ arguments };
-		context.modelComponent->MoveToInventory(msg);
+	} else if (command == "add") {
+		AddMessage msg{ context.arguments, context.modelOwner->GetObjectID() };
+		context.modelComponent->AddBehavior(msg);
+		SendBehaviorListToClient(context);
+	} else if (command == "moveToInventory" || command == "remove") {
+		// both moveToInventory and remove use the same args
+		const bool isRemove = command != "remove";
+		MoveToInventoryMessage msg{ arguments, modelOwner->GetObjectID() };
+		context.modelComponent->RemoveBehavior(msg, isRemove);
 		auto* characterComponent = modelOwner->GetComponent<CharacterComponent>();
 		if (!characterComponent) return;
 
-		AMFArrayValue args;
-		args.Insert("BehaviorID", std::to_string(msg.GetBehaviorId()));
-		GameMessages::SendUIMessageServerToSingleClient(modelOwner, characterComponent->GetSystemAddress(), "BehaviorRemoved", args);
+		if (!isRemove) {
+			AMFArrayValue args;
+			args.Insert("BehaviorID", std::to_string(msg.GetBehaviorId()));
+			GameMessages::SendUIMessageServerToSingleClient(modelOwner, characterComponent->GetSystemAddress(), "BehaviorRemoved", args);
+		}
 
 		SendBehaviorListToClient(context);
-	} else if (command == "updateAction") {
-		context.modelComponent->HandleControlBehaviorsMsg<UpdateActionMessage>(arguments);
 	} else {
 		LOG("Unknown behavior command (%s)", command.data());
 	}
+
+	if (needsNewBehaviorID) RequestUpdatedID(context);
 }
 
 ControlBehaviors::ControlBehaviors() {

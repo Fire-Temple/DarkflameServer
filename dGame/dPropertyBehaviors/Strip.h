@@ -40,6 +40,8 @@ public:
 
 	// 2 actions are required for strips to work
 	bool HasMinimumActions() const { return m_Actions.size() >= 2; }
+	
+	void OnChatMessageReceived(const std::string& sMessage);
 private:
 	// Indicates this Strip is waiting for an action to be taken upon it to progress to its actions
 	bool m_WaitingForAction{ false };
@@ -63,6 +65,8 @@ private:
 
 	// The position of the parent model on the previous frame
 	NiPoint3 m_PreviousFramePosition{};
+
+	NiPoint3 m_SavedVelocity{};
 };
 
 #endif  //!__STRIP__H__

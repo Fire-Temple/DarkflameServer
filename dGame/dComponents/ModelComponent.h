@@ -66,15 +66,18 @@ public:
 	 *
 	 * @tparam Msg The message type to pass
 	 * @param args the arguments of the message to be deserialized
+	 *
+	 * @return returns true if a new behaviorID is needed.
 	 */
 	template<typename Msg>
-	void HandleControlBehaviorsMsg(const AMFArrayValue& args) {
+	bool HandleControlBehaviorsMsg(const AMFArrayValue& args) {
 		static_assert(std::is_base_of_v<BehaviorMessageBase, Msg>, "Msg must be a BehaviorMessageBase");
 		Msg msg{ args };
 		for (auto&& behavior : m_Behaviors) {
 			if (behavior.GetBehaviorId() == msg.GetBehaviorId()) {
+				behavior.CheckModifyState(msg);
 				behavior.HandleMsg(msg);
-				return;
+				return msg.GetNeedsNewBehaviorID();
 			}
 		}
 
@@ -82,22 +85,24 @@ public:
 		if (m_Behaviors.size() > 5) m_Behaviors.resize(5);
 
 		// Do not allow more than 5 to be added. The client UI will break if you do!
-		if (m_Behaviors.size() == 5) return;
+		if (m_Behaviors.size() == 5) return false;
 
 		auto newBehavior = m_Behaviors.insert(m_Behaviors.begin(), PropertyBehavior());
 		// Generally if we are inserting a new behavior, it is because the client is creating a new behavior.
 		// However if we are testing behaviors the behavior will not exist on the initial pass, so we set the ID here to that of the msg.
 		// This will either set the ID to -1 (no change in the current default) or set the ID to the ID of the behavior we are testing.
 		newBehavior->SetBehaviorId(msg.GetBehaviorId());
+		newBehavior->CheckModifyState(msg);
 		newBehavior->HandleMsg(msg);
+		return msg.GetNeedsNewBehaviorID();
 	};
 
 	void AddBehavior(AddMessage& msg);
 
-	void MoveToInventory(MoveToInventoryMessage& msg);
+	void RemoveBehavior(MoveToInventoryMessage& msg, const bool keepItem);
 
 	// Updates the pending behavior ID to the new ID.
-	void UpdatePendingBehaviorId(const int32_t newId);
+	void UpdatePendingBehaviorId(const LWOOBJID newId, const LWOOBJID oldId);
 
 	// Sends the behavior list to the client.
 
@@ -112,11 +117,11 @@ public:
 	 */
 	void SendBehaviorListToClient(AMFArrayValue& args) const;
 
-	void SendBehaviorBlocksToClient(int32_t behaviorToSend, AMFArrayValue& args) const;
+	void SendBehaviorBlocksToClient(const LWOOBJID behaviorToSend, AMFArrayValue& args) const;
 
 	void VerifyBehaviors();
 
-	std::array<std::pair<int32_t, std::string>, 5> GetBehaviorsForSave() const;
+	std::array<std::pair<LWOOBJID, std::string>, 5> GetBehaviorsForSave() const;
 
 	const std::vector<PropertyBehavior>& GetBehaviors() const { return m_Behaviors; };
 
@@ -138,7 +143,22 @@ public:
 
 	// Force sets the velocity to a value.
 	void SetVelocity(const NiPoint3& velocity) const;
+
+	void OnChatMessageReceived(const std::string& sMessage);
+
+	// Sets the speed of the model
+	void SetSpeed(const float newSpeed) { m_Speed = newSpeed; }
+
+	// Whether or not to restart at the end of the frame
+	void RestartAtEndOfFrame() { m_RestartAtEndOfFrame = true; }
 private:
+
+	// Loads a behavior from the database.
+	void LoadBehavior(const LWOOBJID behaviorID, const size_t index, const bool isIndexed);
+
+	// Writes a behavior to a string so it can be saved.
+	std::string SaveBehavior(const PropertyBehavior& behavior) const;
+
 	// Number of Actions that are awaiting an UnSmash to finish.
 	uint32_t m_NumActiveUnSmash{};
 
@@ -171,4 +191,10 @@ private:
 	 * The ID of the user that made the model
 	 */
 	LWOOBJID m_userModelID;
+
+	// The speed at which this model moves
+	float m_Speed{ 3.0f };
+
+	// Whether or not to restart at the end of the frame.
+	bool m_RestartAtEndOfFrame{ false };
 };
