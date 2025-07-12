@@ -7,4 +7,4 @@ original README for FireTemple:
 [FireTemple README](https://github.com/fyreaken/integrationundefined/blob/main/README_firetemple.md)
 
 
-july11th2025
+wndl integration with ft
