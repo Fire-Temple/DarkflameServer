@@ -1,6 +1,8 @@
 #pragma once
 #include "Behavior.h"
 
+#include "NiPoint3.h"
+
 class SpeedBehavior final : public Behavior
 {
 public:
