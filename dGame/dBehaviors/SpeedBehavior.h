@@ -6,6 +6,7 @@
 class SpeedBehavior final : public Behavior
 {
 public:
+	NiPoint3 m_Offset{};
 
 	/*
 	 * Inherited
