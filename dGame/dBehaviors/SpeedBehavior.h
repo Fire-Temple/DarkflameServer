@@ -6,6 +6,8 @@
 class SpeedBehavior final : public Behavior
 {
 public:
+	LOT m_lot;
+	float m_Distance;
 	NiPoint3 m_Offset{};
 
 	/*
