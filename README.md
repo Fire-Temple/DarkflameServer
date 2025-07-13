@@ -17,3 +17,5 @@ original README for FireTemple:
 .
 
 wndl integration with ft
+
+[support discord](https://discord.gg/H6gtWyMGdN)
