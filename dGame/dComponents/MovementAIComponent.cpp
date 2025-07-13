@@ -175,7 +175,6 @@ void MovementAIComponent::Update(const float deltaTime) {
 				Stop();
 				return;
 			}
-		}
 		} else {
 			SetDestination(m_CurrentPath.top().position);
 
