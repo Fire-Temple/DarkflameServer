@@ -5,7 +5,12 @@
 #include "tinyxml2.h"
 #include "dEntity/EntityInfo.h"
 #include "ModelComponent.h"
+#include "ChatPackets.h"
+#include "PropertyManagementComponent.h"
 #include "PlayerManager.h"
+#include "SimplePhysicsComponent.h"
+
+#include "dChatFilter.h"
 
 #include "DluAssert.h"
 
@@ -103,6 +108,16 @@ void Strip::HandleMsg(GameMessages::ResetModelToDefaults& msg) {
 	m_PreviousFramePosition = NiPoint3Constant::ZERO;
 }
 
+void Strip::OnChatMessageReceived(const std::string& sMessage) {
+	if (m_PausedTime > 0.0f || !HasMinimumActions()) return;
+
+	const auto& nextAction = GetNextAction();
+	if (nextAction.GetType() == "OnChat" && nextAction.GetValueParameterString() == sMessage) {
+		IncrementAction();
+		m_WaitingForAction = false;
+	}
+}
+
 void Strip::IncrementAction() {
 	if (m_Actions.empty()) return;
 	m_NextActionIndex++;
@@ -131,6 +146,7 @@ void Strip::ProcNormalAction(float deltaTime, ModelComponent& modelComponent) {
 	auto& entity = *modelComponent.GetParent();
 	auto& nextAction = GetNextAction();
 	auto number = nextAction.GetValueParameterDouble();
+	auto valueStr = nextAction.GetValueParameterString();
 	auto numberAsInt = static_cast<int32_t>(number);
 	auto nextActionType = GetNextAction().GetType();
 
@@ -139,16 +155,18 @@ void Strip::ProcNormalAction(float deltaTime, ModelComponent& modelComponent) {
 	if (nextActionType == "MoveRight" || nextActionType == "MoveLeft") {
 		// X axis
 		bool isMoveLeft = nextActionType == "MoveLeft";
+		int negative = isMoveLeft ? -1 : 1;
 		// Default velocity is 3 units per second.
-		if (modelComponent.TrySetVelocity(NiPoint3{ isMoveLeft ? -3.0f : 3.0f, 0.0f, 0.0f })) {
+		if (modelComponent.TrySetVelocity(NiPoint3Constant::UNIT_X * negative)) {
 			m_PreviousFramePosition = entity.GetPosition();
 			m_InActionMove.x = isMoveLeft ? -number : number;
 		}
 	} else if (nextActionType == "FlyUp" || nextActionType == "FlyDown") {
 		// Y axis
 		bool isFlyDown = nextActionType == "FlyDown";
+		int negative = isFlyDown ? -1 : 1;
 		// Default velocity is 3 units per second.
-		if (modelComponent.TrySetVelocity(NiPoint3{ 0.0f, isFlyDown ? -3.0f : 3.0f, 0.0f })) {
+		if (modelComponent.TrySetVelocity(NiPoint3Constant::UNIT_Y * negative)) {
 			m_PreviousFramePosition = entity.GetPosition();
 			m_InActionMove.y = isFlyDown ? -number : number;
 		}
@@ -156,13 +174,20 @@ void Strip::ProcNormalAction(float deltaTime, ModelComponent& modelComponent) {
 	} else if (nextActionType == "MoveForward" || nextActionType == "MoveBackward") {
 		// Z axis
 		bool isMoveBackward = nextActionType == "MoveBackward";
+		int negative = isMoveBackward ? -1 : 1;
 		// Default velocity is 3 units per second.
-		if (modelComponent.TrySetVelocity(NiPoint3{ 0.0f, 0.0f, isMoveBackward ? -3.0f : 3.0f })) {
+		if (modelComponent.TrySetVelocity(NiPoint3Constant::UNIT_Z * negative)) {
 			m_PreviousFramePosition = entity.GetPosition();
 			m_InActionMove.z = isMoveBackward ? -number : number;
 		}
 	}
 	/* END Move */
+
+	/* BEGIN Navigation */
+	else if (nextActionType == "SetSpeed") {
+		modelComponent.SetSpeed(number);
+	}
+	/* END Navigation */
 
 	/* BEGIN Action */
 	else if (nextActionType == "Smash") {
@@ -183,11 +208,21 @@ void Strip::ProcNormalAction(float deltaTime, ModelComponent& modelComponent) {
 		m_PausedTime = number;
 	} else if (nextActionType == "Wait") {
 		m_PausedTime = number;
+	} else if (nextActionType == "Chat") {
+		bool isOk = Game::chatFilter->IsSentenceOkay(valueStr.data(), eGameMasterLevel::CIVILIAN).empty();
+		// In case a word is removed from the whitelist after it was approved
+		const auto modelName = "%[Objects_" + std::to_string(entity.GetLOT()) + "_name]";
+		if (isOk) ChatPackets::SendChatMessage(UNASSIGNED_SYSTEM_ADDRESS, 12, modelName, entity.GetObjectID(), false, GeneralUtils::ASCIIToUTF16(valueStr));
+		PropertyManagementComponent::Instance()->OnChatMessageReceived(valueStr.data());
+	} else if (nextActionType == "PrivateMessage") {
+		PropertyManagementComponent::Instance()->OnChatMessageReceived(valueStr.data());
 	} else if (nextActionType == "PlaySound") {
 		GameMessages::PlayBehaviorSound sound;
 		sound.target = modelComponent.GetParent()->GetObjectID();
 		sound.soundID = numberAsInt;
 		sound.Send(UNASSIGNED_SYSTEM_ADDRESS);
+	} else if (nextActionType == "Restart") {
+		modelComponent.RestartAtEndOfFrame();
 	}
 	/* END Action */
 	/* BEGIN Gameplay */
@@ -304,6 +339,9 @@ void Strip::Update(float deltaTime, ModelComponent& modelComponent) {
 			Game::entityManager->SerializeEntity(entity);
 			m_WaitingForAction = true;
 
+		} else if (nextAction.GetType() == "OnChat") {
+			Game::entityManager->SerializeEntity(entity);
+			m_WaitingForAction = true;
 		}
 	} else { // should be a normal block
 		ProcNormalAction(deltaTime, modelComponent);

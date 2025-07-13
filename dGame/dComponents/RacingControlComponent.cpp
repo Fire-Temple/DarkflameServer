@@ -390,7 +390,7 @@ void RacingControlComponent::HandleMessageBoxResponse(Entity* player, int32_t bu
 		auto playersRating = m_LoadedPlayers;
 
 		const auto score = playersRating * 10 + data->finished;
-		Loot::GiveActivityLoot(player, m_Parent, m_ActivityID, score);
+		Loot::GiveActivityLoot(player, m_Parent->GetObjectID(), m_ActivityID, score);
 
 		// Giving rewards
 		GameMessages::SendNotifyRacingClient(

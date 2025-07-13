@@ -14,8 +14,6 @@ original README for FireTemple:
 
 16/06/2025
 
-.
-
 wndl integration with ft
 
 [support discord](https://discord.gg/H6gtWyMGdN)

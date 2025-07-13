@@ -6,6 +6,8 @@
 
 namespace ModelNormalizeMigration {
 	void Run();
+	void RunAfterFirstPart();
+	void RunBrickBuildGrid();
 };
 
 #endif //!MODELNORMALIZEMIGRATION_H

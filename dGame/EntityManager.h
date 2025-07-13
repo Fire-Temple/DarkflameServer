@@ -9,10 +9,14 @@
 #include "dCommonVars.h"
 
 class Entity;
-class EntityInfo;
+struct EntityInfo;
 class Player;
 class User;
 enum class eReplicaComponentType : uint32_t;
+
+namespace GameMessages {
+	struct GameMsg;
+}
 
 struct SystemAddress;
 
@@ -52,7 +56,7 @@ public:
 	void SetGhostDistanceMin(float value);
 	void QueueGhostUpdate(LWOOBJID playerID);
 	void UpdateGhosting();
-	void UpdateGhosting(Entity* player);
+	void UpdateGhosting(Entity* player, const bool constructAll = false);
 	void CheckGhosting(Entity* entity);
 	Entity* GetGhostCandidate(LWOOBJID id) const;
 	bool GetGhostingEnabled() const;
@@ -69,6 +73,9 @@ public:
 	const uint32_t GetHardcoreLoseUscoreOnDeathPercent() { return m_HardcoreLoseUscoreOnDeathPercent; };
 	const bool GetHardcoreDropinventoryOnDeath() { return m_HardcoreDropinventoryOnDeath; };
 	const uint32_t GetHardcoreUscoreEnemiesMultiplier() { return m_HardcoreUscoreEnemiesMultiplier; };
+
+	// Messaging
+	bool SendMessage(GameMessages::GameMsg& msg) const;
 
 private:
 	void SerializeEntities();
