@@ -181,7 +181,8 @@ void MovementAIComponent::Update(const float deltaTime) {
 			m_CurrentPath.pop();
 		}
 
-	Game::entityManager->SerializeEntity(m_Parent);
+		Game::entityManager->SerializeEntity(m_Parent);
+	}
 }
 
 const MovementAIInfo& MovementAIComponent::GetInfo() const {
