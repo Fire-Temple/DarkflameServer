@@ -14,4 +14,4 @@ upstream 14/7/2025 3:05am BST
 
 wndl integration with ft
 
-[support discord](https://discord.gg/H6gtWyMGdN)
+[support discord](https://discord.gg/89FqV3rMJM)
