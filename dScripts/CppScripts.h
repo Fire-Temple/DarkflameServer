@@ -361,6 +361,24 @@ namespace CppScripts {
 		virtual void OnZoneLoadedInfo(Entity* self, const GameMessages::ZoneLoadedInfo& info) {};
 
 		/**
+  		 * @brief Handles when an object has arrived at a target spot.
+		 *
+		 * @param self
+		 * @param pathType the type of path the object was following
+		 * @param waypoint index of the waypoint in the path
+		 */
+		virtual void OnArrived(Entity* self, const std::string& pathType, const uint32_t waypoint) {};
+
+		/**
+		 * @brief Handles when an object has loaded on the server
+		 *
+		 * @param self
+		 * @param object the object that was loaded
+		 * @param templateId the template id of the object
+		 */
+		virtual void OnObjectLoaded(Entity* self, LWOOBJID object, LOT templateId) {};
+
+		/*
 		 * @brief Handles notifying when activity data is done
 		 * 
 		 * @param self 
@@ -383,6 +401,13 @@ namespace CppScripts {
 		 * @param fire The child info
 		 */
 		virtual void OnChildLoaded(Entity& self, GameMessages::ChildLoaded& childLoaded) {};
+	protected:
+		Entity* GetEntityByName(const Entity* const self, const std::u16string& name) const;
+
+		void StoreParent(const Entity* const self, const LWOOBJID other) const;
+
+		void StoreEntityByName(Entity* const self, const std::u16string& varName, const LWOOBJID other) const;
+
 	};
 
 	Script* const GetScript(Entity* parent, const std::string& scriptName);

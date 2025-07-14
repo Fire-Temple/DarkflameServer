@@ -2,6 +2,10 @@
 // skate fast eat trash
 // do you think god stays in heaven because he too lives in fear of what he's created?
 
+#include <map>
+#include <string>
+#include <functional>
+
 #include "CppScripts.h"
 #include "GameMessages.h"
 #include "Entity.h"
@@ -64,6 +68,7 @@
 #include "AgSurvivalBuffStation.h"
 #include "QbSpawner.h"
 #include "AgQbWall.h"
+#include "EnemyClearThreat.h"
 
 // NS Scripts
 #include "NsModularBuild.h"
@@ -225,6 +230,7 @@
 #include "NTNaomiDirtServer.h"
 #include "MinigameBlueMark.h"
 #include "NtNaomiBreadcrumbServer.h"
+#include "VisToggleNotifierServer.h"
 
 // DLU Scripts
 #include "DLUVanityTeleportingObject.h"
@@ -295,6 +301,7 @@
 #include "ImaginationBackpackHealServer.h"
 #include "LegoDieRoll.h"
 #include "BuccaneerValiantShip.h"
+#include "XMarksTheSpotChest.h"
 #include "GemPack.h"
 #include "ShardArmor.h"
 #include "TeslaPack.h"
@@ -346,6 +353,37 @@
 #include <map>
 #include <string>
 #include <functional>
+
+// ZP
+#include "BalloonTrigger.h"
+#include "HazmatMissionGiver.h"
+#include "YrkActor.h"
+#include "YrkNpcOnTimer.h"
+#include "WildEuHazmat.h"
+#include "Spout.h"
+#include "BubbleStatue.h"
+#include "ActPetInstance.h"
+#include "SkunkEvent.h"
+#include "YrkNpcStink.h"
+#include "HazmatTruck.h"
+#include "EnemySkunk.h"
+
+// Wonderland
+#include "SpawnSkeletonOnDeath.h"
+#include "DieAfterXSeconds.h"
+#include "SkillCastAndOptionalDeath.h"
+#include "SpawnSnowmanOnDeath.h"
+#include "RubyScepterDrop.h"
+#include "SpawnEntityOnDeath.h"
+#include "HalloweenManager.h"
+#include "AfvNumbchuckServer.h"
+#include "SpawnMaelstromNinjaOnDeath.h"
+#include "NpMilo.h"
+#include "NpAnt.h"
+#include "NpFelix.h"
+#include "NpRotatingPlatform.h"
+#include "NpMime.h"
+#include "NpPicnicBot.h"
 
 // Fire Temple
 #include "FtZoneControl.h"
@@ -460,6 +498,7 @@ namespace {
 		{"scripts\\02_server\\Enemy\\VE\\L_VE_MECH.lua", []() {return new VeMech();}},
 		{"scripts\\02_server\\Map\\VE\\L_MISSION_CONSOLE_SERVER.lua", []() {return new VeMissionConsole();}},
 		{"scripts\\02_server\\Map\\VE\\L_EPSILON_SERVER.lua", []() {return new VeEpsilonServer();}},
+		{"scripts\\02_server\\Map\\General\\L_ENEMY_CLEAR_THREAT.lua", []() {return new EnemyClearThreat();}},
 
 		//NS
 		{"scripts\\ai\\NS\\L_NS_MODULAR_BUILD.lua", []() {return new NsModularBuild();}},
@@ -773,6 +812,47 @@ namespace {
 		{"scripts\\equipmenttriggers\\L_TRIAL_FACTION_ARMOR_SERVER.lua", []() {return new TrialFactionArmorServer();}},
 		{"scripts\\equipmenttriggers\\ImaginationBackPack.lua", []() {return new ImaginationBackPack();}},
 
+		// ZP
+		{"scripts\\ai\\YRK\\L_BALLOONTRIGGER.lua", []() {return new BalloonTrigger();}},
+		{"scripts\\ai\\YRK\\L_HAZMAT_MISSION_GIVER.lua", []() {return new HazmatMissionGiver();}},
+		{"scripts\\ai\\YRK\\L_YRK_ACTOR.lua", []() {return new YrkActor();}},
+		{"scripts\\ai\\YRK\\L_SPOUT.lua", []() {return new Spout();}},
+		{"scripts\\ai\\YRK\\L_BUBBLE_STATUE.lua", []() {return new BubbleStatue();}},
+		{"scripts\\ai\\YRK\\L_YRK_NPC_ON_TIMER.lua", []() {return new YrkNpcOnTimer();}},
+		{"scripts\\ai\\YRK\\L_SKUNK_EVENT.lua", []() {return new SkunkEvent();}},
+		{"scripts\\ai\\YRK\\L_ENEMY_SKUNK.lua", []() {return new EnemySkunk();}},
+		{"scripts\\ai\\YRK\\L_YRK_NPC_STINK.lua", []() {return new YrkNpcStink();}},
+		{"scripts\\ai\\YRK\\L_HAZMAT_TRUCK.lua", []() {return new HazmatTruck();}},
+		{"scripts\\ai\\WILD\\L_WILD_EU_HAZMAT.lua", []() {return new WildEuHazmat();}},
+		{"scripts\\ai\\ACT\\L_ACT_PET_INSTANCE.lua", []() {return new ActPetInstance();}},
+
+		// newcontent
+		{"scripts\\EquipmentScripts\\XMarksTheSpot1.lua", [](){return new XMarksTheSpotChest();}},
+		{"scripts\\DLU\\L_RUBY_SCEPTER_DROP.lua", [](){return new RubyScepterDrop();}}, 
+		{"scripts\\newcontent\\server\\spawnskeletonondeath.lua", []() {return new SpawnSkeletonOnDeath();}},
+		{"scripts\\newcontent\\server\\dieafter10seconds.lua", []() {return new DieAfterXSeconds(10);}},
+		{"scripts\\newcontent\\server\\dieafter20seconds.lua", []() {return new DieAfterXSeconds(20);}},
+		{"scripts\\newcontent\\server\\dieafter30seconds.lua", []() {return new DieAfterXSeconds(30);}},
+		{"scripts\\newcontent\\server\\dieafter40seconds.lua", []() {return new DieAfterXSeconds(40);}},
+		{"scripts\\newcontent\\server\\dieafter50seconds.lua", []() {return new DieAfterXSeconds(50);}},
+		{"scripts\\newcontent\\server\\dieafter60seconds.lua", []() {return new DieAfterXSeconds(60);}},
+		{R"(scripts\newcontent\server\damagereduction999.lua)", []() {return new SkillCastAndOptionalDeath(1996);}},
+		{R"(scripts\newcontent\server\halloweenskeleton.lua)", []() {return new SkillCastAndOptionalDeath(1996, true, 20.0f);}},
+		{R"(scripts\newcontent\server\spawnsnowmanondeath.lua)", []() {return new SpawnSnowmanOnDeath();}},
+		{R"(scripts\newcontent\server\spawnvampireondeath.lua)", []() {return new SpawnEntityOnDeath(30055);}},
+		{R"(scripts\newcontent\server\spawnmummyondeath.lua)", []() {return new SpawnEntityOnDeath(30056);}},
+		{R"(scripts\newcontent\server\spawnhalloweenhorsemanondeath.lua)", []() {return new SpawnEntityOnDeath(41013);}},
+		{R"(scripts\newcontent\server\halloweenminiboss.lua)", []() {return new SkillCastAndOptionalDeath(1996, true, 120.0f);}},
+		{R"(scripts\newcontent\server\halloweenmanager.lua)", []() {return new HalloweenManager();}},
+		{R"(scripts\newcontent\server\afv_numbchuck_server.lua)", []() {return new AfvNumbchuckServer();}},
+		{R"(scripts\newcontent\server\spawnmaelninjaondeath.lua)", []() {return new SpawnMaelstromNinjaOnDeath();}},
+		{R"(scripts\newcontent\server\np_milo.lua)", []() {return new NpMilo();}},
+		{R"(scripts\newcontent\server\np_ant.lua)", []() {return new NpAnt();}},
+		{R"(scripts\newcontent\server\np_felix.lua)", []() {return new NpFelix();}},
+		{R"(scripts\newcontent\server\np_mime.lua)", []() {return new NpMime();}},
+		{R"(scripts\newcontent\server\np_picnicbot.lua)", []() {return new NpPicnicBot();}},
+		{R"(scripts\ai\NP\L_NP_ROTATING_PLATFORM.lua)", []() {return new NpRotatingPlatform();}},
+
 		//Fire Temple
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_ZONE_FIRE_TEMPLE_SERVER.lua", []() { return new FtZoneControl(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_LEG.lua", []() { return new FtLeg(); } },
@@ -817,12 +897,19 @@ namespace {
 		"scripts\\empty.lua",
 		"scripts\\zone\\AG\\L_ZONE_AG.lua",
 		"scripts\\zone\\NS\\L_ZONE_NS.lua",
-		"scripts\\ai\\GF\\L_ZONE_GF.lua",
+		"scripts\\zone\\GF\\L_ZONE_GF.lua",
 		"scripts\\ai\\AG\\CONCERT_STAGE.lua",
 		"scripts\\ai\\NS\\L_NS_CAR_MODULAR_BUILD.lua", // In our implementation, this is done in GameMessages.cpp
 		"scripts\\ai\\PETS\\PET_BLOCKER.lua",
 		"scripts\\ai\\PETS\\PET_FLEA_MISSION.lua",
 		"scripts\\ai\\ACT\\L_ACT_PET_INSTANCE_EXIT.lua",
+		"scripts\\ai\\YRK\\L_MAZE_TROLL.lua",
+		"scripts\\ai\\YRK\\L_HYDRANT_QB.lua",
+		"scripts\\ai\\YRK\\L_MECH_EU_BROOMBOT.lua",
+		"scripts\\ai\\YRK\\L_SKUNK_BOUNCER.lua",
+		"scripts\\ai\\YRK\\L_BABY_SKUNKS.lua",
+		"scripts\\ai\\YRK\\L_HAZMAT_TRUCK_NPC.lua",
+		"scripts\\ai\\YRK\\L_WINDOW_WASHER.lua",
 		"scripts\\ai\\WILD\\L_WILD_GF_FROG.lua",
 		"scripts\\zone\\LUPs\\RobotCity Intro\\WBL_RCIntro_Robotanist.lua",
 		"scripts\\zone\\LUPs\\RobotCity Intro\\WBL_RCIntro_Seperator.lua",
@@ -852,3 +939,19 @@ CppScripts::Script* const CppScripts::GetScript(Entity* parent, const std::strin
 CppScripts::Script* const CppScripts::GetInvalidScript() {
 	return &InvalidToReturn;
 }
+
+Entity* CppScripts::Script::GetEntityByName(const Entity* const self, const std::u16string& name) const {
+	if (name.empty()) return nullptr;
+	return Game::entityManager->GetEntity(self->GetVar<LWOOBJID>(name));
+}
+
+void CppScripts::Script::StoreParent(const Entity* const self, const LWOOBJID other) const {
+	auto* const otherObj = Game::entityManager->GetEntity(other);
+	if (otherObj) {
+		otherObj->SetVar(u"My_Parent_ID", self->GetObjectID());
+	} else LOG("Failed to store parent %llu", self->GetObjectID());
+}
+
+void CppScripts::Script::StoreEntityByName(Entity* const self, const std::u16string& varName, const LWOOBJID other) const {
+	self->SetVar(varName, other);
+ }

@@ -14,6 +14,9 @@
 #include "dZoneManager.h"
 #include "LevelProgressionComponent.h"
 #include "eStateChangeType.h"
+#include "MovementAIComponent.h"
+#include "QuickBuildComponent.h"
+#include "BaseCombatAIComponent.h"
 
 ControllablePhysicsComponent::ControllablePhysicsComponent(Entity* entity, int32_t componentId) : PhysicsComponent(entity, componentId) {
 	m_Velocity = {};
@@ -65,7 +68,18 @@ ControllablePhysicsComponent::~ControllablePhysicsComponent() {
 }
 
 void ControllablePhysicsComponent::Update(float deltaTime) {
+	if (m_Parent->IsPlayer()) return;
 
+	if (m_Parent->GetComponent<BaseCombatAIComponent>()) return; // let combat ai take care of this
+
+	auto* movementAI = m_Parent->GetComponent<MovementAIComponent>();
+	if (movementAI && (!movementAI->AtFinalWaypoint() || movementAI->IsPaused())) return; // let movement ai handle it
+
+	auto* const quickBuildComponent = m_Parent->GetComponent<QuickBuildComponent>();
+	if (quickBuildComponent && quickBuildComponent->GetState() != eQuickBuildState::COMPLETED) return; // quickbulds dont move while not built
+
+	SetPosition(m_Position + m_Velocity * deltaTime);
+	Game::entityManager->SerializeEntity(m_Parent);
 }
 
 void ControllablePhysicsComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) {

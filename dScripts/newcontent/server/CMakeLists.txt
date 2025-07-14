@@ -1,0 +1,15 @@
+set(DSCRIPTS_SOURCES_NEWCONTENT_SERVER
+	"AfvNumbchuckServer.cpp"
+	"SpawnMaelstromNinjaOnDeath.cpp"
+	"DieAfterXSeconds.cpp"
+	"SpawnSkeletonOnDeath.cpp"
+	"SpawnSnowmanOnDeath.cpp"
+	"SkillCastAndOptionalDeath.cpp"
+	"SpawnEntityOnDeath.cpp"
+	"HalloweenManager.cpp"
+	"NpMilo.cpp"
+	"NpAnt.cpp"
+	"NpFelix.cpp"
+	"NpMime.cpp"
+	"NpPicnicBot.cpp"
+	PARENT_SCOPE)

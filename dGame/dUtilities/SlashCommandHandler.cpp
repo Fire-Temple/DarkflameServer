@@ -18,6 +18,7 @@
 #include "Database.h"
 #include "MessageType/Chat.h"
 #include "dServer.h"
+#include "dZoneManager.h"
 
 namespace {
 	std::map<std::string, Command> CommandInfos;
@@ -1452,7 +1453,7 @@ void SlashCommandHandler::Startup() {
 		.requiredLevel = eGameMasterLevel::CIVILIAN
 	};
 	RegisterCommand(removeIgnoreCommand);
-
+  
 	Command command{
 		.help = "Shuts this world down",
 		.info = "Shuts this world down",
