@@ -99,7 +99,8 @@ void SpinnerHighBladeGen::OnProximityUpdate(Entity* self, Entity* entering, std:
 
 				skillComponentPlayer->CalculateBehavior(99994, 99994, entering->GetObjectID(), true);	
 
-				auto dir = entering->GetRotation().GetForwardVector();
+				auto dir = QuatUtils::Forward(entering->GetRotation());
+				
 				dir.y = 11;
 				dir.x = -dir.x * 14;
 				dir.z = -dir.z * 14;

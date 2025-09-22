@@ -29,8 +29,7 @@ void FtFlameJetServer::OnCollisionPhantom(Entity* self, Entity* target) {
 
 	skillComponent->CalculateBehavior(726, 11723, target->GetObjectID(), true);
 
-	auto dir = target->GetRotation().GetForwardVector();
-
+	auto dir = QuatUtils::Forward(target->GetRotation());
 	dir.y = 25;
 	dir.x = -dir.x * 15;
 	dir.z = -dir.z * 15;
@@ -59,13 +58,13 @@ void FtFlameJetServer::SpawnLegs(Entity* self) {
 // if spinner up to down: pos.y = Spinner starting pos (aka Waypoint 1) - 0.2
 //if spinner down to up: pos.y = Spinner starting pos (aka Waypoint 1) - 0.1
 
-	const auto dir = rot.GetRightVector();
+	const auto dir = QuatUtils::Right(rot);	
 	pos.x = legLocX;
 	pos.y = legLocY;
 	pos.z = legLocZ;
 	info.pos = pos;
 
-	info.rot = NiQuaternion::LookAt(info.pos, self->GetPosition());
+	info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
 
 	auto* entity = Game::entityManager->CreateEntity(info);
 

@@ -1102,14 +1102,14 @@ void FtBossManager::SpawnMortar(Entity* self, const std::string& loc) {
 	info.rot = newRot;
 
 	if (loc == "Mortar") {
-		const auto dir = rot.GetRightVector();
+		const auto dir = QuatUtils::Right(rot);
 		pos.x = randomPlayer->GetPosition().x;
 		pos.y = randomPlayer->GetPosition().y;
 		pos.z = randomPlayer->GetPosition().z;
 		info.pos = pos;
 	}
 
-	info.rot = NiQuaternion::LookAt(info.pos, self->GetPosition());
+	info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
 
 	auto* entity = Game::entityManager->CreateEntity(info);
 

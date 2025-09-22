@@ -71,69 +71,69 @@ void SpawnerSpinner71::SpawnLegs(Entity* self, const std::string& loc) {
 
 	if (loc == "Beetle1") {
 		info.lot = 13997;		
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1726.9757;
 		pos.y = 328.5881;
 		pos.z = -121.266;
 		info.pos = pos;
 	} else if (loc == "Beetle2") {
 		info.lot = 13997;	
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1742.26697;
 		pos.y = 328.5881;
 		pos.z = -103.42309;
 		info.pos = pos; 	
 	} else if (loc == "Spinner1") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);	
 		pos.x = -1620.75806;
 		pos.y = 363.62388;
 		pos.z = -58.51917;
 		info.pos = pos;	
 	} else if (loc == "Spinner2") {	
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1627.15234;
 		pos.y = 353.26551;
 		pos.z = 10.39728;
 		info.pos = pos;
 	} else if (loc == "Spinner3") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);	
 		pos.x = -1648.29675;
 		pos.y = 378.76255;
 		pos.z = 3.63825;
 		info.pos = pos;
 	} else if (loc == "Spinner4") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1681.39697;
 		pos.y = 367.84492;
 		pos.z = -230.77191;
 		info.pos = pos;
 	} else if (loc == "Spinner5") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1782.59766;
 		pos.y = 378.79169;
 		pos.z = 4.36175;
 		info.pos = pos;
 	} else if (loc == "Spinner6") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);	
 		pos.x = -1846.72534;
 		pos.y = 365.9621;
 		pos.z = -64.57022;
 		info.pos = pos;
 	} else if (loc == "Spinner7") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1847.27747;
 		pos.y = 365.09278;
 		pos.z = -191.28635;
 		info.pos = pos;
 	} else if (loc == "Spinner8") {
-		const auto dir = rot.GetRightVector();		
+		const auto dir = QuatUtils::Right(rot);		
 		pos.x = -1849.40466;
 		pos.y = 330.00284;
 		pos.z = -230.1709;
 		info.pos = pos;
 	}
 
-	info.rot = NiQuaternion::LookAt(info.pos, self->GetPosition());
+	info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
 	auto* entity = Game::entityManager->CreateEntity(info);
 
 	Game::entityManager->ConstructEntity(entity);

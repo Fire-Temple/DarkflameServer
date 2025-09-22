@@ -30,13 +30,13 @@ void SpinnerSeesaw::SpawnLegs(Entity* self) {
 	info.spawnerID = self->GetObjectID();
 	info.rot = rot;
 
-	const auto dir = rot.GetRightVector();
+	const auto dir = QuatUtils::Right(rot);
 	pos.x = pos.x;
 	pos.y = pos.y - 0.1;
 	pos.z = pos.z;
 	info.pos = pos;
 
-	info.rot = NiQuaternion::LookAt(info.pos, self->GetPosition());
+	info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
 	auto* entity = Game::entityManager->CreateEntity(info);
 	Game::entityManager->ConstructEntity(entity);
 	

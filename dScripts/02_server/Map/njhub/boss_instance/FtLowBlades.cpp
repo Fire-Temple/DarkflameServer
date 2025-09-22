@@ -33,7 +33,7 @@ void FtLowBlades::OnProximityUpdate(Entity* self, Entity* entering, std::string 
 
 				skillComponentPlayer->CalculateBehavior(99994, 99994, entering->GetObjectID(), true); // player's skill	(got hit fx)	
 
-				auto dir = entering->GetRotation().GetForwardVector();
+				auto dir = QuatUtils::Forward(entering->GetRotation());
 
 				dir.y = 11;
 				dir.x = -dir.x * 14;

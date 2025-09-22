@@ -216,16 +216,16 @@ int32_t param1, int32_t param2) {
 	auto* player = Game::entityManager->GetEntity(playerID);	
 
 	NiQuaternion Rot1{};	
-    Rot1.w(-0.1f);
-    Rot1.x(0.0f);
-    Rot1.y(1.0f);
-    Rot1.z(0.0f);	
+    Rot1.w = -0.1f;
+    Rot1.x = 0.0f;
+    Rot1.y = 1.0f;
+    Rot1.z = 0.0f;	
 	
 	NiQuaternion Rot2{};	
-    Rot2.w(0.93f);
-    Rot2.x(0.0f);
-    Rot2.y(0.37f);
-    Rot2.z(0.0f);	
+    Rot2.w = 0.93f;
+    Rot2.x = 0.0f;
+    Rot2.y = 0.37f;
+    Rot2.z = 0.0f;	
 	
 	if (name == "RailWasUsed") {
 //		notify client script				

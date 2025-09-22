@@ -77,7 +77,7 @@ void FtGarmadonTornado::OnProximityUpdate(Entity* self, Entity* entering, std::s
 			skillComponent->CastSkill(this->TornadoHitSkill, entering->GetObjectID());
 			
 //			Knockback for player			
-			auto dir = entering->GetRotation().GetForwardVector();
+			auto dir = QuatUtils::Forward(entering->GetRotation());
 			dir.y = 18;
 			dir.x = -dir.x * 21;
 			dir.z = -dir.z * 21;
