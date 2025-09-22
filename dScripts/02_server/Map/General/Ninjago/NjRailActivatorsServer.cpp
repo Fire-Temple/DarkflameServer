@@ -67,7 +67,7 @@ void NjRailActivatorsServer::OnTimerDone(Entity* self, std::string timerName) {
 		quickBuildComponent->ResetQuickBuild(true);
 		skillComponent->CalculateBehavior(1672, 40837, playerID, true);
 		
-		auto dir = player->GetRotation().GetForwardVector();
+		auto dir = QuatUtils::Forward(player->GetRotation());
 		dir.y = 15;
 		dir.x = -dir.x * 20;
 		dir.z = -dir.z * 20;
