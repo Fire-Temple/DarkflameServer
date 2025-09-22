@@ -141,7 +141,6 @@ namespace GMGreaterThanZeroCommands {
 					characterId = characterInfo->id;
 
 					GeneralUtils::SetBit(characterId, eObjectBits::CHARACTER);
-					GeneralUtils::SetBit(characterId, eObjectBits::PERSISTENT);
 				}
 
 				if (accountId == 0) {
@@ -197,7 +196,7 @@ namespace GMGreaterThanZeroCommands {
 
 			//Notify chat about it
 			CBITSTREAM;
-			BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::GM_MUTE);
+			BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::GM_MUTE);
 
 			bitStream.Write(characterId);
 			bitStream.Write(expire);

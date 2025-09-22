@@ -65,7 +65,7 @@
 #include "NiPoint3.h"
 #include "eServerDisconnectIdentifiers.h"
 #include "eObjectBits.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Server.h"
 #include "MessageType/Chat.h"
 #include "MessageType/World.h"
@@ -160,6 +160,7 @@ int main(int argc, char** argv) {
 	//Create all the objects we need to run our service:
 	Server::SetupLogger("WorldServer_" + std::to_string(zoneID) + "_" + std::to_string(g_InstanceID));
 	if (!Game::logger) return EXIT_FAILURE;
+	Game::config->LogSettings();
 
 	LOG("Starting World server...");
 	LOG("Version: %s", Game::projectVersion.c_str());
@@ -236,7 +237,7 @@ int main(int argc, char** argv) {
 		Game::logger,
 		masterIP,
 		masterPort,
-		ServerType::World,
+		ServiceType::WORLD,
 		Game::config,
 		&Game::lastSignal,
 		masterPassword,
@@ -555,7 +556,7 @@ void HandlePacketChat(Packet* packet) {
 	}
 
 	if (packet->data[0] == ID_USER_PACKET_ENUM && packet->length >= 4) {
-		if (static_cast<eConnectionType>(packet->data[1]) == eConnectionType::CHAT) {
+		if (static_cast<ServiceType>(packet->data[1]) == ServiceType::CHAT) {
 			switch (static_cast<MessageType::Chat>(packet->data[3])) {
 			case MessageType::Chat::WORLD_ROUTE_PACKET: {
 				CINSTREAM_SKIP_HEADER;
@@ -673,7 +674,7 @@ void HandlePacketChat(Packet* packet) {
 
 void HandleMasterPacket(Packet* packet) {
 	if (packet->length < 2) return;
-	if (static_cast<eConnectionType>(packet->data[1]) != eConnectionType::MASTER || packet->length < 4) return;
+	if (static_cast<ServiceType>(packet->data[1]) != ServiceType::MASTER || packet->length < 4) return;
 	switch (static_cast<MessageType::Master>(packet->data[3])) {
 	case MessageType::Master::REQUEST_PERSISTENT_ID_RESPONSE: {
 		CINSTREAM_SKIP_HEADER;
@@ -740,7 +741,7 @@ void HandleMasterPacket(Packet* packet) {
 			//Notify master:
 			{
 				CBITSTREAM;
-				BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::PLAYER_ADDED);
+				BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::PLAYER_ADDED);
 				bitStream.Write<LWOMAPID>(Game::server->GetZoneID());
 				bitStream.Write<LWOINSTANCEID>(g_InstanceID);
 				Game::server->SendToMaster(bitStream);
@@ -757,7 +758,7 @@ void HandleMasterPacket(Packet* packet) {
 
 		CBITSTREAM;
 
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::AFFIRM_TRANSFER_RESPONSE);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::AFFIRM_TRANSFER_RESPONSE);
 		bitStream.Write(requestID);
 		Game::server->SendToMaster(bitStream);
 
@@ -834,7 +835,7 @@ void HandlePacket(Packet* packet) {
 
 		{
 			CBITSTREAM;
-			BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
+			BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
 			bitStream.Write(user->GetLoggedInChar());
 			Game::chatServer->Send(&bitStream, SYSTEM_PRIORITY, RELIABLE, 0, Game::chatSysAddr, false);
 		}
@@ -846,7 +847,7 @@ void HandlePacket(Packet* packet) {
 		}
 
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::PLAYER_REMOVED);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::PLAYER_REMOVED);
 		bitStream.Write<LWOMAPID>(Game::server->GetZoneID());
 		bitStream.Write<LWOINSTANCEID>(g_InstanceID);
 		Game::server->SendToMaster(bitStream);
@@ -858,14 +859,14 @@ void HandlePacket(Packet* packet) {
 	LUBitStream luBitStream;
 	luBitStream.ReadHeader(inStream);
 
-	if (luBitStream.connectionType == eConnectionType::SERVER) {
+	if (luBitStream.connectionType == ServiceType::COMMON) {
 		if (static_cast<MessageType::Server>(luBitStream.internalPacketID) == MessageType::Server::VERSION_CONFIRM) {
 			AuthPackets::HandleHandshake(Game::server, packet);
 		}
 	}
 
-	if (luBitStream.connectionType != eConnectionType::WORLD) return;
-
+	if (luBitStream.connectionType != ServiceType::WORLD) return;
+	LOG_DEBUG("Got world packet %s", StringifiedEnum::ToString(static_cast<MessageType::World>(luBitStream.internalPacketID)).data());
 	switch (static_cast<MessageType::World>(luBitStream.internalPacketID)) {
 	case MessageType::World::VALIDATION: {
 		CINSTREAM_SKIP_HEADER;
@@ -915,7 +916,7 @@ void HandlePacket(Packet* packet) {
 
 		//Request the session info from Master:
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::REQUEST_SESSION_KEY);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::REQUEST_SESSION_KEY);
 		bitStream.Write(username);
 		Game::server->SendToMaster(bitStream);
 
@@ -987,7 +988,7 @@ void HandlePacket(Packet* packet) {
 
 		LWOOBJID playerID = 0;
 		inStream.Read(playerID);
-
+		LOG("User is requesting to login with character %llu", playerID);
 		bool valid = CheatDetection::VerifyLwoobjidIsSender(
 			playerID,
 			packet->systemAddress,
@@ -995,26 +996,23 @@ void HandlePacket(Packet* packet) {
 			"Sending login request with a sending player that does not match their own. Player ID: %llu",
 			playerID
 		);
-
+		LOG("Login request for player %llu is %s", playerID, valid ? "valid" : "invalid");
 		if (!valid) return;
-
-		GeneralUtils::ClearBit(playerID, eObjectBits::CHARACTER);
-		GeneralUtils::ClearBit(playerID, eObjectBits::PERSISTENT);
 
 		auto user = UserManager::Instance()->GetUser(packet->systemAddress);
 
 		if (user) {
 			auto lastCharacter = user->GetLoggedInChar();
 			// This means we swapped characters and we need to remove the previous player from the container.
-			if (static_cast<uint32_t>(lastCharacter) != playerID) {
+			if (lastCharacter != playerID) {
 				CBITSTREAM;
-				BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
+				BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
 				bitStream.Write(lastCharacter);
 				Game::chatServer->Send(&bitStream, SYSTEM_PRIORITY, RELIABLE, 0, Game::chatSysAddr, false);
 			}
 		}
 
-		UserManager::Instance()->LoginCharacter(packet->systemAddress, static_cast<uint32_t>(playerID));
+		UserManager::Instance()->LoginCharacter(packet->systemAddress, playerID);
 		break;
 	}
 
@@ -1044,7 +1042,7 @@ void HandlePacket(Packet* packet) {
 				auto* characterComponent = player->GetComponent<CharacterComponent>();
 				if (!characterComponent) return;
 
-				WorldPackets::SendCreateCharacter(packet->systemAddress, player->GetComponent<CharacterComponent>()->GetReputation(), player->GetObjectID(), c->GetXMLData(), username, c->GetGMLevel());
+				WorldPackets::SendCreateCharacter(packet->systemAddress, player->GetComponent<CharacterComponent>()->GetReputation(), player->GetObjectID(), c->GetXMLData(), username, c->GetGMLevel(), c->GetPropertyCloneID());
 				WorldPackets::SendServerState(packet->systemAddress);
 
 				const auto respawnPoint = player->GetCharacter()->GetRespawnPoint(Game::zoneManager->GetZone()->GetWorldID());
@@ -1052,7 +1050,7 @@ void HandlePacket(Packet* packet) {
 				Game::entityManager->ConstructEntity(player, UNASSIGNED_SYSTEM_ADDRESS);
 
 				if (respawnPoint != NiPoint3Constant::ZERO) {
-					GameMessages::SendPlayerReachedRespawnCheckpoint(player, respawnPoint, NiQuaternionConstant::IDENTITY);
+					GameMessages::SendPlayerReachedRespawnCheckpoint(player, respawnPoint, QuatUtils::IDENTITY);
 				}
 
 				Game::entityManager->ConstructAllEntities(packet->systemAddress);
@@ -1161,7 +1159,7 @@ void HandlePacket(Packet* packet) {
 						// Workaround for not having a UGC server to get model LXFML onto the client so it
 						// can generate the physics and nif for the object.
 						CBITSTREAM;
-						BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
+						BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
 						bitStream.Write<LWOOBJID>(LWOOBJID_EMPTY); //always zero so that a check on the client passes
 						bitStream.Write(eBlueprintSaveResponseType::EverythingWorked);
 						bitStream.Write<uint32_t>(1);
@@ -1193,7 +1191,7 @@ void HandlePacket(Packet* packet) {
 					const auto& playerName = character->GetName();
 
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::LOGIN_SESSION_NOTIFY);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::LOGIN_SESSION_NOTIFY);
 					bitStream.Write(player->GetObjectID());
 					bitStream.Write<uint32_t>(playerName.size());
 					for (size_t i = 0; i < playerName.size(); i++) {
@@ -1251,7 +1249,7 @@ void HandlePacket(Packet* packet) {
 
 		CBITSTREAM;
 
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, packet->data[14]);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, packet->data[14]);
 
 		//We need to insert the player's objectID so the chat server can find who originated this request:
 		LWOOBJID objectID = 0;
@@ -1520,6 +1518,6 @@ void FinalizeShutdown() {
 
 void SendShutdownMessageToMaster() {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SHUTDOWN_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SHUTDOWN_RESPONSE);
 	Game::server->SendToMaster(bitStream);
 }

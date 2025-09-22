@@ -76,6 +76,8 @@ namespace DEVGMCommands {
 	void DeleteInven(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Shutdown(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Barfight(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Despawn(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Execute(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 }
 
 #endif  //!DEVGMCOMMANDS_H

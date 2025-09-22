@@ -175,6 +175,8 @@ public:
 
 	void AddComponent(eReplicaComponentType componentId, Component* component);
 
+	bool MsgRequestServerObjectInfo(GameMessages::GameMsg& msg);
+
 	// This is expceted to never return nullptr, an assert checks this.
 	CppScripts::Script* const GetScript() const;
 
@@ -336,6 +338,10 @@ public:
 
 	bool HandleMsg(GameMessages::GameMsg& msg) const;
 
+	void RegisterMsg(const MessageType::Game msgId, auto* self, const auto handler) {
+		RegisterMsg(msgId, std::bind(handler, self, std::placeholders::_1));
+	}
+
 	/**
 	 * @brief The observable for player entity position updates.
 	 */
@@ -351,7 +357,7 @@ private:
 	std::vector<LDFBaseData*> m_NetworkSettings;
 
 	NiPoint3 m_DefaultPosition;
-	NiQuaternion m_DefaultRotation;
+	NiQuaternion m_DefaultRotation = QuatUtils::IDENTITY;
 	float m_Scale;
 
 	Spawner* m_Spawner;

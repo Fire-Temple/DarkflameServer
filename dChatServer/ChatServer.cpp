@@ -13,7 +13,7 @@
 #include "Diagnostics.h"
 #include "AssetManager.h"
 #include "BinaryPathFinder.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "PlayerContainer.h"
 #include "ChatPacketHandler.h"
 #include "MessageType/Chat.h"
@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
 	//Create all the objects we need to run our service:
 	Server::SetupLogger("ChatServer");
 	if (!Game::logger) return EXIT_FAILURE;
+	Game::config->LogSettings();
 
 	//Read our config:
 
@@ -123,7 +124,7 @@ int main(int argc, char** argv) {
 	const auto externalIPString = Game::config->GetValue("external_ip");
 	if (!externalIPString.empty()) ourIP = externalIPString;
 
-	Game::server = new dServer(ourIP, ourPort, 0, maxClients, false, true, Game::logger, masterIP, masterPort, ServerType::Chat, Game::config, &Game::lastSignal, masterPassword);
+	Game::server = new dServer(ourIP, ourPort, 0, maxClients, false, true, Game::logger, masterIP, masterPort, ServiceType::CHAT, Game::config, &Game::lastSignal, masterPassword);
 
 	const bool dontGenerateDCF = GeneralUtils::TryParse<bool>(Game::config->GetValue("dont_generate_dcf")).value_or(false);
 	Game::chatFilter = new dChatFilter(Game::assetManager->GetResPath().string() + "/chatplus_en_us", dontGenerateDCF);
@@ -218,11 +219,11 @@ void HandlePacket(Packet* packet) {
 	CINSTREAM;
 	inStream.SetReadOffset(BYTES_TO_BITS(1));
 
-	eConnectionType connection;
-	MessageType::Chat chatMessageID;
-
+	ServiceType connection;
 	inStream.Read(connection);
-	if (connection != eConnectionType::CHAT) return;
+	if (connection != ServiceType::CHAT) return;
+
+	MessageType::Chat chatMessageID;
 	inStream.Read(chatMessageID);
 
 	// Our packing byte wasnt there? Probably a false packet

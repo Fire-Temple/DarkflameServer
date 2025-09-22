@@ -29,6 +29,11 @@
 #include "CDMissionEmailTable.h"
 #include "ChatPackets.h"
 #include "PlayerManager.h"
+#include "StringifiedEnum.h"
+
+namespace {
+	std::set<uint32_t> g_TestedMissions = {773, 774, 775, 776, 777}; // TODO Figure out why these missions are broken sometimes
+}
 
 Mission::Mission(MissionComponent* missionComponent, const uint32_t missionId) {
 	m_MissionComponent = missionComponent;
@@ -96,20 +101,18 @@ void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
 		if (index >= m_Tasks.size()) {
 			break;
 		}
+		auto* const curTask = m_Tasks[index];
 
-		const auto type = m_Tasks[index]->GetType();
+		const auto type = curTask->GetType();
 
-		if (type == eMissionTaskType::COLLECTION ||
-			type == eMissionTaskType::VISIT_PROPERTY) {
+		auto value = std::stoul(task->Attribute("v"));
+		curTask->SetProgress(value, false);
+		task = task->NextSiblingElement();
+
+		// Collection tasks and visit property tasks store each of the collected/visited targets after the progress value
+		if (type == eMissionTaskType::COLLECTION || type == eMissionTaskType::VISIT_PROPERTY) {
 			std::vector<uint32_t> uniques;
-
-			const auto value = std::stoul(task->Attribute("v"));
-
-			m_Tasks[index]->SetProgress(value, false);
-
-			task = task->NextSiblingElement();
-
-			while (task != nullptr) {
+			while (task != nullptr && value > 0) {
 				const auto unique = std::stoul(task->Attribute("v"));
 
 				uniques.push_back(unique);
@@ -119,19 +122,10 @@ void Mission::LoadFromXmlCur(const tinyxml2::XMLElement& element) {
 				}
 
 				task = task->NextSiblingElement();
+				value--;
 			}
 
-			m_Tasks[index]->SetUnique(uniques);
-
-			m_Tasks[index]->SetProgress(uniques.size(), false);
-
-			break;
-		} else {
-			const auto value = std::stoul(task->Attribute("v"));
-
-			m_Tasks[index]->SetProgress(value, false);
-
-			task = task->NextSiblingElement();
+			curTask->SetUnique(uniques);
 		}
 
 		index++;
@@ -163,31 +157,19 @@ void Mission::UpdateXmlCur(tinyxml2::XMLElement& element) {
 
 	if (IsComplete()) return;
 
-	for (auto* task : m_Tasks) {
-		if (task->GetType() == eMissionTaskType::COLLECTION ||
-			task->GetType() == eMissionTaskType::VISIT_PROPERTY) {
-
-			auto* child = element.GetDocument()->NewElement("sv");
-
-			child->SetAttribute("v", static_cast<unsigned int>(task->GetProgress()));
-
-			element.LinkEndChild(child);
-
-			for (auto unique : task->GetUnique()) {
-				auto* uniqueElement = element.GetDocument()->NewElement("sv");
-
-				uniqueElement->SetAttribute("v", static_cast<unsigned int>(unique));
-
-				element.LinkEndChild(uniqueElement);
-			}
-
-			break;
-		}
-		auto* child = element.GetDocument()->NewElement("sv");
-
+	for (const auto* const task : m_Tasks) {
+		auto* const child = element.InsertNewChildElement("sv");
 		child->SetAttribute("v", static_cast<unsigned int>(task->GetProgress()));
 
-		element.LinkEndChild(child);
+		// Collection and visit property tasks then need to store the collected/visited items after the progress
+		const auto taskType = task->GetType();
+		if (taskType == eMissionTaskType::COLLECTION || taskType == eMissionTaskType::VISIT_PROPERTY) {
+			for (const auto unique : task->GetUnique()) {
+				auto* uniqueElement = element.InsertNewChildElement("sv");
+
+				uniqueElement->SetAttribute("v", static_cast<unsigned int>(unique));
+			}
+		}
 	}
 }
 
@@ -506,12 +488,7 @@ void Mission::YieldRewards() {
 
 			// If a mission rewards zero of an item, make it reward 1.
 			auto count = pair.second > 0 ? pair.second : 1;
-
-			// Sanity check, 6 is the max any mission yields
-			if (count > 6) {
-				count = 0;
-			}
-
+			LOG("Player %llu is receiving %i of item %i from repeatable mission %i", entity->GetObjectID(), count, pair.first, info.id);
 			inventoryComponent->AddItem(pair.first, count, IsMission() ? eLootSourceType::MISSION : eLootSourceType::ACHIEVEMENT);
 		}
 
@@ -539,12 +516,7 @@ void Mission::YieldRewards() {
 
 		// If a mission rewards zero of an item, make it reward 1.
 		auto count = pair.second > 0 ? pair.second : 1;
-
-		// Sanity check, 6 is the max any mission yields
-		if (count > 6) {
-			count = 0;
-		}
-
+		LOG("Player %llu is receiving %i of item %i from mission %i", entity->GetObjectID(), count, pair.first, info.id);
 		inventoryComponent->AddItem(pair.first, count, IsMission() ? eLootSourceType::MISSION : eLootSourceType::ACHIEVEMENT);
 	}
 
@@ -596,12 +568,14 @@ void Mission::YieldRewards() {
 
 void Mission::Progress(eMissionTaskType type, int32_t value, LWOOBJID associate, const std::string& targets, int32_t count) {
 	const auto isRemoval = count < 0;
-
+	const bool testedMission = GetTestedMissions().contains(GetMissionId());
+	if (testedMission) LOG("%i Removal: %s complete: %s achievement: %s", GetMissionId(), isRemoval ? "true" : "false", IsComplete() ? "true" : "false", IsAchievement() ? "true" : "false");
 	if (isRemoval && (IsComplete() || IsAchievement())) {
 		return;
 	}
 
 	for (auto* task : m_Tasks) {
+		if (testedMission) LOG("Complete: %s Type: %s TaskType: %s", task->IsComplete() ? "true" : "false", StringifiedEnum::ToString(type).data(), StringifiedEnum::ToString(task->GetType()).data());
 		if (task->IsComplete() && !isRemoval) {
 			continue;
 		}
@@ -650,4 +624,8 @@ Mission::~Mission() {
 	}
 
 	m_Tasks.clear();
+}
+
+const std::set<uint32_t>& Mission::GetTestedMissions() const {
+	return g_TestedMissions;
 }

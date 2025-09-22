@@ -331,7 +331,7 @@ public:
 	void LoadVisitedLevelsXml(const tinyxml2::XMLElement& doc);
 private:
 
-	bool OnRequestServerObjectInfo(GameMessages::GameMsg& msg);
+	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
 
 	/**
 	 * The map of active venture vision effects
@@ -622,7 +622,7 @@ private:
 
 	NiPoint3 m_respawnPos;
 
-	NiQuaternion m_respawnRot;
+	NiQuaternion m_respawnRot = QuatUtils::IDENTITY;
 
 	std::map<LWOOBJID, Loot::Info> m_DroppedLoot;
 

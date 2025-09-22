@@ -15,9 +15,9 @@
 #include "eGameMasterLevel.h"
 
 class AMFBaseValue;
+class AMFArrayValue;
 class Entity;
 class Item;
-class NiQuaternion;
 class User;
 class Leaderboard;
 class PropertySelectQueryProperty;
@@ -765,7 +765,7 @@ namespace GameMessages {
 		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
 
 		NiPoint3 target{};
-		NiQuaternion rotation{};
+		NiQuaternion rotation = QuatUtils::IDENTITY;
 	};
 
 	struct ChildLoaded : public GameMsg {
@@ -787,6 +787,14 @@ namespace GameMessages {
 		RequestServerObjectInfo() : GameMsg(MessageType::Game::REQUEST_SERVER_OBJECT_INFO, eGameMasterLevel::DEVELOPER) {}
 		bool Deserialize(RakNet::BitStream& bitStream) override;
 		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
+	};
+
+	struct GetObjectReportInfo : public GameMsg {
+		AMFArrayValue* info{};
+		AMFArrayValue* subCategory{};
+		bool bVerbose{};
+
+		GetObjectReportInfo() : GameMsg(MessageType::Game::GET_OBJECT_REPORT_INFO, eGameMasterLevel::DEVELOPER) {}
 	};
 
 	struct RequestUse : public GameMsg {
@@ -854,6 +862,14 @@ namespace GameMessages {
 		GetPosition() : GameMsg(MessageType::Game::GET_POSITION) {}
 
 		NiPoint3 pos{};
+	};
+
+	struct SetFaction : public GameMsg {
+		SetFaction() : GameMsg(MessageType::Game::SET_FACTION) {}
+
+		int32_t factionID{};
+
+		bool bIgnoreChecks{ false };
 	};
 };
 #endif // GAMEMESSAGES_H

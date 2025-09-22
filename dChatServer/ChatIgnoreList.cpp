@@ -13,11 +13,11 @@
 // The only thing not auto-handled is instance activities force joining the team on the server.
 
 void WriteOutgoingReplyHeader(RakNet::BitStream& bitStream, const LWOOBJID& receivingPlayer, const MessageType::Client type) {
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::WORLD_ROUTE_PACKET);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::WORLD_ROUTE_PACKET);
 	bitStream.Write(receivingPlayer);
 
 	//portion that will get routed:
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, type);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, type);
 }
 
 void ChatIgnoreList::GetIgnoreList(Packet* packet) {
@@ -34,7 +34,7 @@ void ChatIgnoreList::GetIgnoreList(Packet* packet) {
 	if (!receiver.ignoredPlayers.empty()) {
 		LOG_DEBUG("Player %llu already has an ignore list, but is requesting it again.", playerId);
 	} else {
-		auto ignoreList = Database::Get()->GetIgnoreList(static_cast<uint32_t>(playerId));
+		auto ignoreList = Database::Get()->GetIgnoreList(playerId);
 		if (ignoreList.empty()) {
 			LOG_DEBUG("Player %llu has no ignores", playerId);
 			return;
@@ -43,7 +43,6 @@ void ChatIgnoreList::GetIgnoreList(Packet* packet) {
 		for (auto& ignoredPlayer : ignoreList) {
 			receiver.ignoredPlayers.emplace_back(ignoredPlayer.name, ignoredPlayer.id);
 			GeneralUtils::SetBit(receiver.ignoredPlayers.back().playerId, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(receiver.ignoredPlayers.back().playerId, eObjectBits::PERSISTENT);
 		}
 	}
 
@@ -114,9 +113,8 @@ void ChatIgnoreList::AddIgnore(Packet* packet) {
 		}
 
 		if (ignoredPlayerId != LWOOBJID_EMPTY) {
-			Database::Get()->AddIgnore(static_cast<uint32_t>(playerId), static_cast<uint32_t>(ignoredPlayerId));
+			Database::Get()->AddIgnore(playerId, ignoredPlayerId);
 			GeneralUtils::SetBit(ignoredPlayerId, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(ignoredPlayerId, eObjectBits::PERSISTENT);
 
 			receiver.ignoredPlayers.emplace_back(toIgnoreStr, ignoredPlayerId);
 			LOG_DEBUG("Player %llu is ignoring %s", playerId, toIgnoreStr.c_str());
@@ -157,7 +155,7 @@ void ChatIgnoreList::RemoveIgnore(Packet* packet) {
 		return;
 	}
 
-	Database::Get()->RemoveIgnore(static_cast<uint32_t>(playerId), static_cast<uint32_t>(toRemove->playerId));
+	Database::Get()->RemoveIgnore(playerId, toRemove->playerId);
 	receiver.ignoredPlayers.erase(toRemove, receiver.ignoredPlayers.end());
 
 	CBITSTREAM;

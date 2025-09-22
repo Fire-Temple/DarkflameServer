@@ -52,6 +52,25 @@ std::vector<LOT> EntityManager::m_GhostingExcludedLOTs = {
 	4967
 };
 
+void EntityManager::ReloadConfig() {
+	auto hcmode = Game::config->GetValue("hardcore_mode");
+	m_HardcoreMode = hcmode.empty() ? false : (hcmode == "1");
+	auto hcUscorePercent = Game::config->GetValue("hardcore_lose_uscore_on_death_percent");
+	m_HardcoreLoseUscoreOnDeathPercent = hcUscorePercent.empty() ? 10 : std::stoi(hcUscorePercent);
+	auto hcUscoreMult = Game::config->GetValue("hardcore_uscore_enemies_multiplier");
+	m_HardcoreUscoreEnemiesMultiplier = hcUscoreMult.empty() ? 2 : std::stoi(hcUscoreMult);
+	auto hcDropInv = Game::config->GetValue("hardcore_dropinventory_on_death");
+	m_HardcoreDropinventoryOnDeath = hcDropInv.empty() ? false : (hcDropInv == "1");
+	auto hcExcludedItemDrops = Game::config->GetValue("hardcore_excluded_item_drops");
+	m_HardcoreExcludedItemDrops.clear();
+	for (const auto& strLot : GeneralUtils::SplitString(hcExcludedItemDrops, ',')) {
+		const auto lot = GeneralUtils::TryParse<LOT>(strLot);
+		if (lot) {
+			m_HardcoreExcludedItemDrops.insert(lot.value());
+		}
+	}
+}
+
 void EntityManager::Initialize() {
 	// Check if this zone has ghosting enabled
 	m_GhostingEnabled = std::find(
@@ -61,15 +80,8 @@ void EntityManager::Initialize() {
 	) == m_GhostingExcludedZones.end();
 
 	// grab hardcore mode settings and load them with sane defaults
-	auto hcmode = Game::config->GetValue("hardcore_mode");
-	m_HardcoreMode = hcmode.empty() ? false : (hcmode == "1");
-	auto hcUscorePercent = Game::config->GetValue("hardcore_lose_uscore_on_death_percent");
-	m_HardcoreLoseUscoreOnDeathPercent = hcUscorePercent.empty() ? 10 : std::stoi(hcUscorePercent);
-	auto hcUscoreMult = Game::config->GetValue("hardcore_uscore_enemies_multiplier");
-	m_HardcoreUscoreEnemiesMultiplier = hcUscoreMult.empty() ? 2 : std::stoi(hcUscoreMult);
-	auto hcDropInv = Game::config->GetValue("hardcore_dropinventory_on_death");
-	m_HardcoreDropinventoryOnDeath = hcDropInv.empty() ? false : (hcDropInv == "1");
-
+	Game::config->AddConfigHandler([]() {Game::entityManager->ReloadConfig();});
+	Game::entityManager->ReloadConfig();
 	// If cloneID is not zero, then hardcore mode is disabled
 	// aka minigames and props
 	if (Game::zoneManager->GetZoneID().GetCloneID() != 0) m_HardcoreMode = false;
@@ -129,6 +141,8 @@ Entity* EntityManager::CreateEntity(EntityInfo info, User* user, Entity* parentE
 	// Set the zone control entity if the entity is a zone control object, this should only happen once
 	if (controller) {
 		m_ZoneControlEntity = entity;
+		// Proooooobably shouldn't ghost zoneControl
+		m_ZoneControlEntity->SetIsGhostingCandidate(false);
 	}
 
 	// Check if this entity is a respawn point, if so add it to the registry
@@ -279,6 +293,8 @@ std::vector<Entity*> EntityManager::GetEntitiesByComponent(const eReplicaCompone
 
 			withComp.push_back(entity);
 		}
+	} else {
+		for (auto* const entity : m_Entities | std::views::values) withComp.push_back(entity);
 	}
 	return withComp;
 }
@@ -394,7 +410,7 @@ void EntityManager::ConstructAllEntities(const SystemAddress& sysAddr) {
 		}
 	}
 
-	UpdateGhosting(PlayerManager::GetPlayer(sysAddr), true);
+	UpdateGhosting(PlayerManager::GetPlayer(sysAddr));
 }
 
 void EntityManager::DestructEntity(Entity* entity, const SystemAddress& sysAddr) {
@@ -463,7 +479,7 @@ void EntityManager::UpdateGhosting() {
 	m_PlayersToUpdateGhosting.clear();
 }
 
-void EntityManager::UpdateGhosting(Entity* player, const bool constructAll) {
+void EntityManager::UpdateGhosting(Entity* player) {
 	if (!player) return;
 
 	auto* missionComponent = player->GetComponent<MissionComponent>();
@@ -512,9 +528,6 @@ void EntityManager::UpdateGhosting(Entity* player, const bool constructAll) {
 			ghostComponent->ObserveEntity(id);
 
 			entity->SetObservers(entity->GetObservers() + 1);
-
-			// TODO: figure out if zone control should be ghosted at all
-			if (constructAll && entity->GetObjectID() == GetZoneControlEntity()->GetObjectID()) continue;
 
 			ConstructEntity(entity, player->GetSystemAddress());
 		}

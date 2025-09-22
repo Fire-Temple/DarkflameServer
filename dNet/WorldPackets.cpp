@@ -7,12 +7,12 @@
 #include "LDFFormat.h"
 #include "dServer.h"
 #include "ZCompression.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "BitStreamUtils.h"
 
 #include <iostream>
 
-void HTTPMonitorInfo::Serialize(RakNet::BitStream &bitStream) const {
+void HTTPMonitorInfo::Serialize(RakNet::BitStream& bitStream) const {
 	bitStream.Write(port);
 	bitStream.Write<uint8_t>(openWeb);
 	bitStream.Write<uint8_t>(supportsSum);
@@ -23,7 +23,7 @@ void HTTPMonitorInfo::Serialize(RakNet::BitStream &bitStream) const {
 
 void WorldPackets::SendLoadStaticZone(const SystemAddress& sysAddr, float x, float y, float z, uint32_t checksum, LWOZONEID zone) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::LOAD_STATIC_ZONE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::LOAD_STATIC_ZONE);
 
 	bitStream.Write<uint16_t>(zone.GetMapID());
 	bitStream.Write<uint16_t>(zone.GetInstanceID());
@@ -44,28 +44,28 @@ void WorldPackets::SendLoadStaticZone(const SystemAddress& sysAddr, float x, flo
 
 void WorldPackets::SendCharacterCreationResponse(const SystemAddress& sysAddr, eCharacterCreationResponse response) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::CHARACTER_CREATE_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::CHARACTER_CREATE_RESPONSE);
 	bitStream.Write(response);
 	SEND_PACKET;
 }
 
 void WorldPackets::SendCharacterRenameResponse(const SystemAddress& sysAddr, eRenameResponse response) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::CHARACTER_RENAME_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::CHARACTER_RENAME_RESPONSE);
 	bitStream.Write(response);
 	SEND_PACKET;
 }
 
 void WorldPackets::SendCharacterDeleteResponse(const SystemAddress& sysAddr, bool response) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::DELETE_CHARACTER_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::DELETE_CHARACTER_RESPONSE);
 	bitStream.Write<uint8_t>(response);
 	SEND_PACKET;
 }
 
 void WorldPackets::SendTransferToWorld(const SystemAddress& sysAddr, const std::string& serverIP, uint32_t serverPort, bool mythranShift) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::TRANSFER_TO_WORLD);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::TRANSFER_TO_WORLD);
 
 	bitStream.Write(LUString(serverIP));
 	bitStream.Write<uint16_t>(serverPort);
@@ -76,37 +76,34 @@ void WorldPackets::SendTransferToWorld(const SystemAddress& sysAddr, const std::
 
 void WorldPackets::SendServerState(const SystemAddress& sysAddr) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::SERVER_STATES);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::SERVER_STATES);
 	bitStream.Write<uint8_t>(1); //If the server is receiving this request, it probably is ready anyway.
 	SEND_PACKET;
 }
 
-void WorldPackets::SendCreateCharacter(const SystemAddress& sysAddr, int64_t reputation, LWOOBJID player, const std::string& xmlData, const std::u16string& username, eGameMasterLevel gm) {
+void WorldPackets::SendCreateCharacter(const SystemAddress& sysAddr, int64_t reputation, LWOOBJID player, const std::string& xmlData, const std::u16string& username, eGameMasterLevel gm, const LWOCLONEID cloneID) {
+	using namespace std;
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::CREATE_CHARACTER);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::CREATE_CHARACTER);
 
 	RakNet::BitStream data;
-	data.Write<uint32_t>(7); //LDF key count
 
-	std::unique_ptr<LDFData<LWOOBJID>> objid(new LDFData<LWOOBJID>(u"objid", player));
-	std::unique_ptr<LDFData<LOT>> lot(new LDFData<LOT>(u"template", 1));
-	std::unique_ptr<LDFData<std::string>> xmlConfigData(new LDFData<std::string>(u"xmlData", xmlData));
-	std::unique_ptr<LDFData<std::u16string>> name(new LDFData<std::u16string>(u"name", username));
-	std::unique_ptr<LDFData<int32_t>> gmlevel(new LDFData<int32_t>(u"gmlevel", static_cast<int32_t>(gm)));
-	std::unique_ptr<LDFData<int32_t>> chatmode(new LDFData<int32_t>(u"chatmode", static_cast<int32_t>(gm)));
-	std::unique_ptr<LDFData<int64_t>> reputationLdf(new LDFData<int64_t>(u"reputation", reputation));
-
-	objid->WriteToPacket(data);
-	lot->WriteToPacket(data);
-	name->WriteToPacket(data);
-	gmlevel->WriteToPacket(data);
-	chatmode->WriteToPacket(data);
-	xmlConfigData->WriteToPacket(data);
-	reputationLdf->WriteToPacket(data);
+	std::vector<std::unique_ptr<LDFBaseData>> ldfData;
+	ldfData.push_back(std::move(make_unique<LDFData<LWOOBJID>>(u"objid", player)));
+	ldfData.push_back(std::move(make_unique<LDFData<LOT>>(u"template", 1)));
+	ldfData.push_back(std::move(make_unique<LDFData<string>>(u"xmlData", xmlData)));
+	ldfData.push_back(std::move(make_unique<LDFData<u16string>>(u"name", username)));
+	ldfData.push_back(std::move(make_unique<LDFData<int32_t>>(u"gmlevel", static_cast<int32_t>(gm))));
+	ldfData.push_back(std::move(make_unique<LDFData<int32_t>>(u"chatmode", static_cast<int32_t>(gm))));
+	ldfData.push_back(std::move(make_unique<LDFData<int64_t>>(u"reputation", reputation)));
+	ldfData.push_back(std::move(make_unique<LDFData<int32_t>>(u"propertycloneid", cloneID)));
+	
+	data.Write<uint32_t>(ldfData.size());
+	for (const auto& toSerialize : ldfData) toSerialize->WriteToPacket(data);
 
 	//Compress the data before sending:
-    const uint32_t reservedSize = ZCompression::GetMaxCompressedLength(data.GetNumberOfBytesUsed());
-    uint8_t* compressedData = new uint8_t[reservedSize];
+	const uint32_t reservedSize = ZCompression::GetMaxCompressedLength(data.GetNumberOfBytesUsed());
+	uint8_t* compressedData = new uint8_t[reservedSize];
 
 	// TODO There should be better handling here for not enough memory...
 	if (!compressedData) return;
@@ -136,7 +133,7 @@ void WorldPackets::SendCreateCharacter(const SystemAddress& sysAddr, int64_t rep
 
 void WorldPackets::SendChatModerationResponse(const SystemAddress& sysAddr, bool requestAccepted, uint32_t requestID, const std::string& receiver, std::set<std::pair<uint8_t, uint8_t>> unacceptedItems) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::CHAT_MODERATION_STRING);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::CHAT_MODERATION_STRING);
 
 	bitStream.Write<uint8_t>(unacceptedItems.empty()); // Is sentence ok?
 	bitStream.Write<uint16_t>(0x16); // Source ID, unknown
@@ -160,7 +157,7 @@ void WorldPackets::SendChatModerationResponse(const SystemAddress& sysAddr, bool
 
 void WorldPackets::SendGMLevelChange(const SystemAddress& sysAddr, bool success, eGameMasterLevel highestLevel, eGameMasterLevel prevLevel, eGameMasterLevel newLevel) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::MAKE_GM_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::MAKE_GM_RESPONSE);
 
 	bitStream.Write<uint8_t>(success);
 	bitStream.Write(static_cast<uint16_t>(highestLevel));
@@ -172,14 +169,14 @@ void WorldPackets::SendGMLevelChange(const SystemAddress& sysAddr, bool success,
 
 void WorldPackets::SendHTTPMonitorInfo(const SystemAddress& sysAddr, const HTTPMonitorInfo& info) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::HTTP_MONITOR_INFO_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::HTTP_MONITOR_INFO_RESPONSE);
 	info.Serialize(bitStream);
 	SEND_PACKET;
 }
 
-void WorldPackets::SendDebugOuput(const SystemAddress& sysAddr, const std::string& data){
+void WorldPackets::SendDebugOuput(const SystemAddress& sysAddr, const std::string& data) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::DEBUG_OUTPUT);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::DEBUG_OUTPUT);
 	bitStream.Write<uint32_t>(data.size());
 	bitStream.Write(data);
 	SEND_PACKET;
