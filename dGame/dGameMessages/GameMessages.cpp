@@ -2609,12 +2609,9 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 		if (!entity || !entity->GetCharacter() || !entity->GetCharacter()->GetParentUser()) return;
 		LWOOBJID newIDL = newID;
 		GeneralUtils::SetBit(newIDL, eObjectBits::CHARACTER);
-		GeneralUtils::SetBit(newIDL, eObjectBits::PERSISTENT);
 
-		uint32_t blueprintIDSmall = ObjectIDManager::GenerateRandomObjectID();
-		LWOOBJID blueprintID = blueprintIDSmall;
+		LWOOBJID blueprintID = ObjectIDManager::GenerateRandomObjectID();
 		GeneralUtils::SetBit(blueprintID, eObjectBits::CHARACTER);
-		GeneralUtils::SetBit(blueprintID, eObjectBits::PERSISTENT);
 
 		//We need to get the propertyID: (stolen from Wincent's propertyManagementComp)
 		const auto& worldId = Game::zoneManager->GetZone()->GetZoneID();
@@ -2638,12 +2635,12 @@ void GameMessages::HandleBBBSaveRequest(RakNet::BitStream& inStream, Entity* ent
 		// Recompress the data and save to the database
 		sd0.FromData(reinterpret_cast<const uint8_t*>(newLxfml.data()), newLxfml.size());
 		auto sd0AsStream = sd0.GetAsStream();
-		Database::Get()->InsertNewUgcModel(sd0AsStream, blueprintIDSmall, entity->GetCharacter()->GetParentUser()->GetAccountID(), entity->GetCharacter()->GetID());
+		Database::Get()->InsertNewUgcModel(sd0AsStream, blueprintID, entity->GetCharacter()->GetParentUser()->GetAccountID(), entity->GetCharacter()->GetID());
 
 		//Insert into the db as a BBB model:
 		IPropertyContents::Model model;
 		model.id = newIDL;
-		model.ugcId = blueprintIDSmall;
+		model.ugcId = blueprintID;
 		model.position = newCenter;
 		model.rotation = NiQuaternion(0.0f, 0.0f, 0.0f, 0.0f);
 		model.lot = 14;

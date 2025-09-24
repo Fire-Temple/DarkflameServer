@@ -16,14 +16,14 @@ public:
 		NiQuaternion rotation = QuatUtils::IDENTITY;
 		LWOOBJID id{};
 		LOT lot{};
-		uint32_t ugcId{};
+		LWOOBJID ugcId{};
 		std::array<LWOOBJID, 5> behaviors{};
 	};
 
 	// Inserts a new UGC model into the database.
 	virtual void InsertNewUgcModel(
 		std::stringstream& sd0Data,
-		const uint32_t blueprintId,
+		const uint64_t blueprintId,
 		const uint32_t accountId,
 		const LWOOBJID characterId) = 0;
 
