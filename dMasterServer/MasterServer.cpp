@@ -190,11 +190,16 @@ int main(int argc, char** argv) {
 		const auto fdbPath = Game::assetManager->GetResPath() / "cdclient.fdb";
 
 		if (std::filesystem::exists(fdbPath)) {
-			// Get file modification time
 			auto ftime = std::filesystem::last_write_time(fdbPath);
-			auto sctp = std::chrono::system_clock::now() + (ftime - decltype(ftime)::clock::now());
-			std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
 
+			// Convert file_time_type to system_clock::time_point
+			auto sctp = std::chrono::system_clock::time_point(
+				std::chrono::duration_cast<std::chrono::system_clock::duration>(
+					ftime.time_since_epoch()
+				)
+			);
+
+			std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
 
 			std::ostringstream timeStream;
 			timeStream << std::put_time(std::gmtime(&cftime), "%Y-%m-%dT%H:%M:%SZ");
