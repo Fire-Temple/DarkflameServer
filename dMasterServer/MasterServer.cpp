@@ -46,10 +46,18 @@
 
 #ifdef DARKFLAME_PLATFORM_UNIX
 
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+#include <windows.h>
+using pid_t = DWORD;
+#endif
+
 
 namespace Game {
 	Logger* logger = nullptr;
@@ -93,6 +101,7 @@ int main(int argc, char** argv) {
 	std::atexit([]() { ShutdownSequence(); });
 	std::signal(SIGINT, Game::OnSignal);
 	std::signal(SIGTERM, Game::OnSignal);
+
 
 	Game::config = new dConfig("masterconfig.ini");
 
@@ -161,11 +170,9 @@ int main(int argc, char** argv) {
 
 	MigrationRunner::RunMigrations();
 	Database::Get()->Commit();
+
 	const auto resServerPath = BinaryPathFinder::GetBinaryDir() / "resServer";
 	std::filesystem::create_directories(resServerPath);
-	const bool cdServerExists = std::filesystem::exists(resServerPath / "CDServer.sqlite");
-	const bool oldCDServerExists = std::filesystem::exists(Game::assetManager->GetResPath() / "CDServer.sqlite");
-	const bool fdbExists = std::filesystem::exists(Game::assetManager->GetResPath() / "cdclient.fdb");
 	const bool resServerPathExists = std::filesystem::is_directory(resServerPath);
 
 	if (!resServerPathExists) {
@@ -176,9 +183,54 @@ int main(int argc, char** argv) {
 		}
 	}
 
+
+	std::string fdbTimestamp;
+	bool shouldRemoveCDServer = false;
+	try {
+		const auto fdbPath = Game::assetManager->GetResPath() / "cdclient.fdb";
+
+		if (std::filesystem::exists(fdbPath)) {
+			// Get file modification time
+			auto ftime = std::filesystem::last_write_time(fdbPath);
+			auto sctp = std::chrono::system_clock::now() + (ftime - decltype(ftime)::clock::now());
+			std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
+
+
+			std::ostringstream timeStream;
+			timeStream << std::put_time(std::gmtime(&cftime), "%Y-%m-%dT%H:%M:%SZ");
+			fdbTimestamp = timeStream.str();
+
+			LOG("cdclient.fdb timestamp: %s", fdbTimestamp.c_str());
+
+			// Compare with config value
+			const std::string currentTimestamp = Game::config->GetValue("cdclient_timestamp");
+			if (currentTimestamp != fdbTimestamp) {
+				LOG("cdclient.fdb timestamp mismatch detected — CDServer.sqlite will be rebuilt.");
+				shouldRemoveCDServer = true;
+			}
+		} else {
+			LOG("cdclient.fdb not found at %s", fdbPath.string().c_str());
+		}
+	} catch (const std::exception& e) {
+		LOG("Error checking cdclient.fdb timestamp: %s", e.what());
+	}
+
+	if (shouldRemoveCDServer) {
+		const auto cdServerPath = resServerPath / "CDServer.sqlite";
+		if (std::filesystem::exists(cdServerPath)) {
+			LOG("Deleting old CDServer.sqlite due to cdclient.fdb change...");
+			std::filesystem::remove(cdServerPath);
+		}
+	}
+
+
+	const bool cdServerExists = std::filesystem::exists(resServerPath / "CDServer.sqlite");
+	const bool oldCDServerExists = std::filesystem::exists(Game::assetManager->GetResPath() / "CDServer.sqlite");
+	const bool fdbExists = std::filesystem::exists(Game::assetManager->GetResPath() / "cdclient.fdb");
+
 	if (!cdServerExists) {
 		if (oldCDServerExists) {
-			// If the file doesn't exist in the new CDServer location, copy it there.  We copy because we may not have write permissions from the previous directory.
+			// If the file doesn't exist in the new CDServer location, copy it there.
 			LOG("CDServer.sqlite is not located at resServer, but is located at res path.  Copying file...");
 			std::filesystem::copy_file(Game::assetManager->GetResPath() / "CDServer.sqlite", resServerPath / "CDServer.sqlite");
 		} else {
@@ -201,6 +253,45 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
+
+	if (shouldRemoveCDServer && !fdbTimestamp.empty()) {
+		const auto masterConfigPath = BinaryPathFinder::GetBinaryDir() / "masterconfig.ini";
+
+		try {
+			std::ifstream inFile(masterConfigPath);
+			std::string content;
+			std::string line;
+			bool foundLine = false;
+
+			if (inFile.is_open()) {
+				while (std::getline(inFile, line)) {
+					if (line.rfind("cdclient_timestamp=", 0) == 0) {
+						content += "cdclient_timestamp=" + fdbTimestamp + "\n";
+						foundLine = true;
+					} else {
+						content += line + "\n";
+					}
+				}
+				inFile.close();
+			}
+
+			if (!foundLine) {
+				content += "\ncdclient_timestamp=" + fdbTimestamp + "\n";
+			}
+
+			std::ofstream outFile(masterConfigPath, std::ios::trunc);
+			if (outFile.is_open()) {
+				outFile << content;
+				outFile.close();
+				LOG("Updated cdclient_timestamp in masterconfig.ini after successful rebuild.");
+			} else {
+				LOG("Failed to open masterconfig.ini for writing.");
+			}
+		} catch (const std::exception& e) {
+			LOG("Error writing cdclient_timestamp: %s", e.what());
+		}
+	}
+
 
 	//Connect to CDClient
 	try {
@@ -327,6 +418,77 @@ int main(int argc, char** argv) {
 
 		return EXIT_SUCCESS;
 	}
+
+
+	// Check for -pid <processID> flag
+	pid_t monitorPid = -1;
+	for (int i = 1; i < argc; ++i) {
+		if (strcmp(argv[i], "-pid") == 0 && i + 1 < argc) {
+			monitorPid = static_cast<pid_t>(std::stoi(argv[i + 1]));
+			break;
+		}
+	}
+
+	if (monitorPid != -1) {
+
+		// If bad PID, skip
+		if (monitorPid <= 0) {
+			LOG("Invalid or missing PID provided with -pid flag. Exiting.");
+			return EXIT_SUCCESS;
+		}
+
+		LOG("Monitoring external process with PID %d", monitorPid);
+
+		// Start thread
+		std::thread([monitorPid]() {
+#ifdef DARKFLAME_PLATFORM_UNIX
+			// Does PID exist?
+			if (kill(monitorPid, 0) == -1) {
+				LOG("Process %d not found or not accessible. Exiting.", monitorPid);
+				std::exit(EXIT_SUCCESS);
+			}
+#endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+			HANDLE hProc = OpenProcess(SYNCHRONIZE, FALSE, monitorPid);
+			if (!hProc) {
+				LOG("Process %d could not be opened. Exiting.", monitorPid);
+				std::exit(EXIT_SUCCESS);
+			}
+			CloseHandle(hProc);
+#endif
+
+			while (true) {
+#ifdef DARKFLAME_PLATFORM_UNIX
+				// kill(pid, 0) returns 0 if process exists, -1 if not
+				if (kill(monitorPid, 0) == -1) {
+					LOG("Watched process %d exited, shutting down MasterServer...", monitorPid);
+					std::raise(SIGINT);
+					break;
+				}
+#endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+				HANDLE hProc = OpenProcess(SYNCHRONIZE, FALSE, monitorPid);
+				if (hProc) {
+					DWORD result = WaitForSingleObject(hProc, 1000);
+					CloseHandle(hProc);
+					if (result == WAIT_OBJECT_0) {
+						LOG("Watched process %d exited, shutting down MasterServer...", monitorPid);
+						std::raise(SIGINT);
+						break;
+					}
+				} else {
+					LOG("Could not open process %d, assuming it has exited.", monitorPid);
+					std::raise(SIGINT);
+					break;
+				}
+#endif
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+			}
+		}).detach();
+	}
+
 
 	Game::randomEngine = std::mt19937(time(0));
 	uint32_t maxClients = 999;
