@@ -74,6 +74,7 @@ These commands are primarily for development and testing. The usage of many of t
 |debugui|`/debugui`|Toggle Debug UI.|8|
 |dismount|`/dismount`|Dismounts you from the vehicle or mount.|8|
 |reloadconfig|`/reloadconfig`|Reloads the server with the new config values.|8|
+|reload|`/reload`|Unloads all maps, reloads your current map. All other users will be booted to login|8|
 |force-save|`/force-save`|While saving to database usually happens on regular intervals and when you disconnect from the server, this command saves your player's data to the database.|8|
 |freecam|`/freecam`|Toggles freecam mode.|8|
 |freemoney|`/freemoney <coins>`|Gives coins.|8|

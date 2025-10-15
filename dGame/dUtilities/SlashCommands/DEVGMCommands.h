@@ -29,6 +29,7 @@ namespace DEVGMCommands {
 	void DebugUi(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Dismount(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void ReloadConfig(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Reload(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void ForceSave(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Freecam(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void FreeMoney(Entity* entity, const SystemAddress& sysAddr, const std::string args);

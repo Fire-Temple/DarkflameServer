@@ -19,6 +19,7 @@
 #include "MessageType/Chat.h"
 #include "dServer.h"
 
+
 namespace {
 	std::map<std::string, Command> CommandInfos;
 	std::map<std::string, Command> RegisteredCommands;
@@ -411,6 +412,15 @@ void SlashCommandHandler::Startup() {
 		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
 	RegisterCommand(ReloadConfigCommand);
+
+	Command ReloadCommand{
+		.help = "Unloads all maps, reloads yours",
+		.info = "Unloads all maps, reloads your current map. All other users will be booted to login",
+		.aliases = { "reload" },
+		.handle = DEVGMCommands::Reload,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(ReloadCommand);
 
 	Command ForceSaveCommand{
 		.help = "Force save your player",

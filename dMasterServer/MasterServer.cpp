@@ -78,6 +78,11 @@ std::map<uint32_t, std::string> activeSessions;
 SystemAddress authServerMasterPeerSysAddr;
 SystemAddress chatServerMasterPeerSysAddr;
 
+// purge related
+void HandlePurge();
+uint32_t safeZoneID = 4294967295;
+uint32_t safeInstanceID = 4294967295;
+
 int GenerateBCryptPassword(const std::string& password, const int workFactor, char salt[BCRYPT_HASHSIZE], char hash[BCRYPT_HASHSIZE]) {
 	int32_t bcryptState = ::bcrypt_gensalt(workFactor, salt);
 	assert(bcryptState == 0);
@@ -853,10 +858,19 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirZoneID);
 			inStream.Read(theirInstanceID);
 
-			const auto& instance =
-				Game::im->FindInstance(theirZoneID, theirInstanceID);
+			const auto& instance = Game::im->FindInstance(theirZoneID, theirInstanceID);
 			if (instance) {
-				instance->AddPlayer(Player());
+				instance->AddPlayer(Player());	
+
+				if (theirZoneID == safeZoneID && theirInstanceID == safeInstanceID) {
+					// Player reached safe zone, purge the remaining zones
+					HandlePurge();
+					
+					// Since 0 is a zone, yeah this is fine
+					safeZoneID = 4294967295;
+					safeInstanceID = 4294967295;
+				}
+				
 			} else {
 				LOG("Instance missing? What?");
 			}
@@ -1019,6 +1033,25 @@ void HandlePacket(Packet* packet) {
 			Game::universeShutdownRequested = true;
 			break;
 		}
+		
+		
+		case MessageType::Master::PURGE_WORLDS: {		
+			RakNet::BitStream inStream(packet->data, packet->length, false);
+			uint64_t header = inStream.Read(header);
+
+			uint32_t zoneID = 0;
+			uint32_t instanceID = 0;
+			
+			inStream.Read(zoneID);
+			inStream.Read(instanceID);			
+			
+			safeZoneID = zoneID;
+			safeInstanceID = instanceID;
+
+			LOG("Received purge command. Assigning safe zone as zoneID %i instanceID %i", safeZoneID, safeInstanceID);		
+			
+			break;
+		}		
 
 		default:
 			LOG("Unknown master packet ID from server: %i", packet->data[3]);
@@ -1123,4 +1156,36 @@ int32_t FinalizeShutdown(int32_t signal) {
 
 	if (signal != EXIT_SUCCESS) exit(signal);
 	return signal;
+}
+
+
+
+void HandlePurge() {
+	LOG("Destroying instances");
+
+	const auto& instances = Game::im->GetInstances();
+
+	for (const auto& instance : instances) {
+		if (instance == nullptr) {
+			break;
+		} else if (instance->GetMapID() != safeZoneID || instance->GetInstanceID() != safeInstanceID) {
+			instance->Shutdown();
+			instance->SetIsShuttingDown(true);
+			Game::im->RedirectPendingRequests(instance);
+		} else {
+			LOG("skipped instance with ZoneID %i and InstanceID %i", safeZoneID, safeInstanceID);
+		}
+	}
+
+	// Remove instances
+	for (const auto& instance : instances) {
+		if (instance == nullptr) {
+			break;
+		}
+
+		if (instance->GetShutdownComplete()) {
+			Game::im->RemoveInstance(instance);
+		}
+	}	
+	
 }

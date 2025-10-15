@@ -54,6 +54,8 @@
 #include "StringifiedEnum.h"
 
 
+
+
 namespace DEVGMCommands {
 	void SetGMLevel(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
 		User* user = UserManager::Instance()->GetUser(entity->GetSystemAddress());
@@ -1298,6 +1300,51 @@ namespace DEVGMCommands {
 		Game::server->UpdateMaximumMtuSize();
 		Game::server->UpdateBandwidthLimit();
 		ChatPackets::SendSystemMessage(sysAddr, u"Successfully reloaded config for world!");
+	}
+
+	void Reload(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
+		ChatPackets::SendSystemMessage(sysAddr, u"Reload command called");
+
+		const auto zoneId = Game::zoneManager->GetZone()->GetZoneID();
+		const LWOINSTANCEID instanceId = zoneId.GetInstanceID();
+		const auto objid = entity->GetObjectID();
+		const uint32_t targetCloneID = zoneId.GetCloneID() + 70;	
+		const uint32_t targetMapID = zoneId.GetMapID();						
+
+		ZoneInstanceManager::Instance()->RequestZoneTransfer(Game::server, targetMapID, targetCloneID, false, [objid](bool mythranShift, uint32_t zoneID, uint32_t zoneInstance, uint32_t zoneClone, std::string serverIP, uint16_t serverPort) {
+
+			auto* entity = Game::entityManager->GetEntity(objid);
+			if (!entity) return;
+
+			const auto sysAddr = entity->GetSystemAddress();
+
+			ChatPackets::SendSystemMessage(sysAddr, u"Transfering map...");
+
+			LOG("Transferring %s to Zone %i (Instance %i | Clone %i | Mythran Shift: %s) with IP %s and Port %i", sysAddr.ToString(), zoneID, zoneInstance, zoneClone, mythranShift == true ? "true" : "false", serverIP.c_str(), serverPort);
+			if (entity->GetCharacter()) {
+				auto* characterComponent = entity->GetComponent<CharacterComponent>();
+				if (characterComponent) {
+					characterComponent->AddVisitedLevel(LWOZONEID(zoneID, LWOINSTANCEID_INVALID, zoneClone));
+				}
+				entity->GetCharacter()->SetZoneID(zoneID);
+				entity->GetCharacter()->SetZoneInstance(zoneInstance);
+				entity->GetCharacter()->SetZoneClone(zoneClone);
+				entity->GetComponent<CharacterComponent>()->SetLastRocketConfig(u"");
+			}
+
+			entity->GetCharacter()->SaveXMLToDatabase();
+
+			WorldPackets::SendTransferToWorld(sysAddr, serverIP, serverPort, mythranShift);			
+			
+			//Tell the master server to prepare the purge
+						
+			CBITSTREAM;
+			BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::PURGE_WORLDS);
+			bitStream.Write(zoneID);
+			bitStream.Write(zoneInstance);		
+			Game::server->SendToMaster(bitStream);
+			return;
+			});
 	}
 
 	void RollLoot(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
