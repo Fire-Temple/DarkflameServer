@@ -26,6 +26,8 @@
 #include "Database.h"
 #include "CDObjectsTable.h"
 #include "CDRewardCodesTable.h"
+#include "CDLootMatrixTable.h"
+#include "CDLootTableTable.h"
 
 // Components
 #include "BuffComponent.h"
@@ -52,7 +54,7 @@
 #include "eInventoryType.h"
 #include "ePlayerFlag.h"
 #include "StringifiedEnum.h"
-
+#include "BinaryPathFinder.h"
 
 
 
@@ -91,7 +93,8 @@ namespace DEVGMCommands {
 			GameMessages::SendChatModeUpdate(entity->GetObjectID(), eGameMasterLevel::CIVILIAN);
 			entity->SetGMLevel(eGameMasterLevel::CIVILIAN);
 
-			GameMessages::SendToggleGMInvis(entity->GetObjectID(), false, UNASSIGNED_SYSTEM_ADDRESS);
+			GameMessages::ToggleGMInvis msg;
+			msg.Send(entity->GetObjectID());
 
 			GameMessages::SendSlashCommandFeedbackText(entity, u"Your game master level has been changed, you may not be able to use all commands.");
 		}
@@ -178,14 +181,15 @@ namespace DEVGMCommands {
 			charComp->m_Character->SetRightHand(minifigItemId);
 		} else {
 			Game::entityManager->ConstructEntity(entity);
+			Game::entityManager->ConstructEntity(entity, entity->GetSystemAddress());
 			ChatPackets::SendSystemMessage(sysAddr, u"Invalid Minifig item to change, try one of the following: Eyebrows, Eyes, HairColor, HairStyle, Pants, LeftHand, Mouth, RightHand, Shirt, Hands");
 			return;
 		}
 
 		Game::entityManager->ConstructEntity(entity);
+		Game::entityManager->ConstructEntity(entity, entity->GetSystemAddress());
 		ChatPackets::SendSystemMessage(sysAddr, GeneralUtils::ASCIIToUTF16(lowerName) + u" set to " + (GeneralUtils::to_u16string(minifigItemId)));
 
-		GameMessages::SendToggleGMInvis(entity->GetObjectID(), false, UNASSIGNED_SYSTEM_ADDRESS); // need to retoggle because it gets reenabled on creation of new character
 	}
 
 	void PlayAnimation(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
@@ -370,6 +374,18 @@ namespace DEVGMCommands {
 		}
 	}
 
+	void HandleMacro(Entity& entity, const SystemAddress& sysAddr, std::istream& inStream) {
+		if (inStream.good()) {
+			std::string line;
+			while (std::getline(inStream, line)) {
+				// Do this in two separate calls to catch both \n and \r\n
+				line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+				line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+				SlashCommandHandler::HandleChatCommand(GeneralUtils::ASCIIToUTF16(line), &entity, sysAddr);
+			}
+		}
+	}
+
 	void RunMacro(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
 		const auto splitArgs = GeneralUtils::SplitString(args, ' ');
 		if (splitArgs.empty()) return;
@@ -378,24 +394,16 @@ namespace DEVGMCommands {
 		if (splitArgs[0].find("/") != std::string::npos) return;
 		if (splitArgs[0].find("\\") != std::string::npos) return;
 
-		auto infile = Game::assetManager->GetFile(("macros/" + splitArgs[0] + ".scm").c_str());
-
-		if (!infile) {
+		const auto resServerPath = BinaryPathFinder::GetBinaryDir() / "resServer";
+		auto infile = Game::assetManager->GetFile("macros/" + splitArgs[0] + ".scm");
+		auto resServerInFile = std::ifstream(resServerPath / "macros" / (splitArgs[0] + ".scm"));
+		if (!infile.good() && !resServerInFile.good()) {
 			ChatPackets::SendSystemMessage(sysAddr, u"Unknown macro! Is the filename right?");
 			return;
 		}
 
-		if (infile.good()) {
-			std::string line;
-			while (std::getline(infile, line)) {
-				// Do this in two separate calls to catch both \n and \r\n
-				line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-				line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
-				SlashCommandHandler::HandleChatCommand(GeneralUtils::ASCIIToUTF16(line), entity, sysAddr);
-			}
-		} else {
-			ChatPackets::SendSystemMessage(sysAddr, u"Unknown macro! Is the filename right?");
-		}
+		HandleMacro(*entity, sysAddr, infile);
+		HandleMacro(*entity, sysAddr, resServerInFile);
 	}
 
 	void AddMission(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
@@ -739,10 +747,39 @@ namespace DEVGMCommands {
 
 		auto tables = query.execQuery();
 
+		std::map<LOT, std::string> lotToName{};
+		std::map<std::string, LOT> nameToLot{};
 		while (!tables.eof()) {
-			std::string message = std::to_string(tables.getIntField("id")) + " - " + tables.getStringField("name");
-			ChatPackets::SendSystemMessage(sysAddr, GeneralUtils::UTF8ToUTF16(message, message.size()));
+			const auto lot = tables.getIntField("id");
+			const auto name = tables.getStringField("name");
+			lotToName[lot] = name;
+			nameToLot[name] = lot;
 			tables.nextRow();
+		}
+
+		// if there arent a ton of results, print them to chat instead
+		if (lotToName.size() < 5) {
+			std::stringstream ss;
+			ss << "Lookup results for \"" << args << "\":";
+			for (const auto& [lot, name] : lotToName) {
+				ss << "\nLOT: " << lot << " - Name: " << name;
+			}
+			ChatPackets::SendSystemMessage(sysAddr, ss.str());
+		} else {
+			AMFArrayValue response;
+			response.Insert("visible", true);
+			response.Insert("objectID", "Search Results for: " + args);
+			response.Insert("serverInfo", true);
+			auto* const info = response.InsertArray("data");
+			auto& lotSort = info->PushDebug("Sorted by LOT");
+			for (const auto& [lot, name] : lotToName) {
+				auto& entry = lotSort.PushDebug<AMFStringValue>(std::to_string(lot)) = name;
+			}
+			auto& nameSort = info->PushDebug("Sorted by Name");
+			for (const auto& [name, lot] : nameToLot) {
+				auto& entry = nameSort.PushDebug<AMFStringValue>(name) = std::to_string(lot);
+			}
+			GameMessages::SendUIMessageServerToSingleClient("ToggleObjectDebugger", response, sysAddr);
 		}
 	}
 
@@ -1252,38 +1289,30 @@ namespace DEVGMCommands {
 	}
 
 	void Metrics(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
+		AMFArrayValue response;
+		response.Insert("visible", true);
+		response.Insert("objectID", "Metrics");
+		response.Insert("serverInfo", true);
+		auto* info = response.InsertArray("data");
 		for (const auto variable : Metrics::GetAllMetrics()) {
+			auto& metricData = info->PushDebug(StringifiedEnum::ToString(variable));
+
 			auto* metric = Metrics::GetMetric(variable);
 
 			if (metric == nullptr) {
 				continue;
 			}
 
-			ChatPackets::SendSystemMessage(
-				sysAddr,
-				GeneralUtils::ASCIIToUTF16(Metrics::MetricVariableToString(variable)) +
-				u": " +
-				GeneralUtils::to_u16string(Metrics::ToMiliseconds(metric->average)) +
-				u"ms"
-			);
+			metricData.PushDebug<AMFStringValue>("Maximum") = std::to_string(Metrics::ToMiliseconds(metric->max)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Minimum") = std::to_string(Metrics::ToMiliseconds(metric->min)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Average") = std::to_string(Metrics::ToMiliseconds(metric->average)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Measurements Count") = std::to_string(metric->measurementSize);
 		}
-
-		ChatPackets::SendSystemMessage(
-			sysAddr,
-			u"Peak RSS: " + GeneralUtils::to_u16string(static_cast<float>(static_cast<double>(Metrics::GetPeakRSS()) / 1.024e6)) +
-			u"MB"
-		);
-
-		ChatPackets::SendSystemMessage(
-			sysAddr,
-			u"Current RSS: " + GeneralUtils::to_u16string(static_cast<float>(static_cast<double>(Metrics::GetCurrentRSS()) / 1.024e6)) +
-			u"MB"
-		);
-
-		ChatPackets::SendSystemMessage(
-			sysAddr,
-			u"Process ID: " + GeneralUtils::to_u16string(Metrics::GetProcessID())
-		);
+		auto& processInfo = info->PushDebug("Process Info");
+		processInfo.PushDebug<AMFStringValue>("Peak RSS") = std::to_string(static_cast<double>(Metrics::GetPeakRSS()) / 1.024e6) + "MB";
+		processInfo.PushDebug<AMFStringValue>("Current RSS") = std::to_string(static_cast<double>(Metrics::GetCurrentRSS()) / 1.024e6) + "MB";
+		processInfo.PushDebug<AMFIntValue>("Process ID") = Metrics::GetProcessID();
+		GameMessages::SendUIMessageServerToSingleClient("ToggleObjectDebugger", response, sysAddr);
 	}
 
 	void ReloadConfig(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
@@ -1360,19 +1389,30 @@ namespace DEVGMCommands {
 		const auto loops = GeneralUtils::TryParse<uint32_t>(splitArgs[2]);
 		if (!loops) return;
 
+		auto* const lootMatrixTable = CDClientManager::GetTable<CDLootMatrixTable>();
+		auto* const lootTableTable = CDClientManager::GetTable<CDLootTableTable>();
+		bool found = false;
+		for (const auto& entry : lootMatrixTable->GetMatrix(lootMatrixIndex.value())) {
+			for (const auto& loot : lootTableTable->GetTable(entry.LootTableIndex)) {
+				found = targetLot.value() == loot.itemid;
+				if (found) break;
+			}
+		}
+
+		if (!found) {
+			std::stringstream ss;
+			ss << "Target LOT " << targetLot.value() << " not found in loot matrix " << lootMatrixIndex.value() << ".";
+			ChatPackets::SendSystemMessage(sysAddr, ss.str());
+			return;
+		}
+
 		uint64_t totalRuns = 0;
 
 		for (uint32_t i = 0; i < loops; i++) {
 			while (true) {
-				auto lootRoll = Loot::RollLootMatrix(lootMatrixIndex.value());
+				const auto lootRoll = Loot::RollLootMatrix(nullptr, lootMatrixIndex.value());
 				totalRuns += 1;
-				bool doBreak = false;
-				for (const auto& kv : lootRoll) {
-					if (static_cast<uint32_t>(kv.first) == targetLot) {
-						doBreak = true;
-					}
-				}
-				if (doBreak) break;
+				if (lootRoll.contains(targetLot.value())) break;
 			}
 		}
 
@@ -1529,52 +1569,62 @@ namespace DEVGMCommands {
 	void Inspect(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
 		const auto splitArgs = GeneralUtils::SplitString(args, ' ');
 		if (splitArgs.empty()) return;
+		const auto idParsed = GeneralUtils::TryParse<LWOOBJID>(splitArgs[0]);
 
+		// First try to get the object by its ID if provided.
+		// Second try to get the object by player name.
+		// Lastly assume we were passed a component or LDF and try to find the closest entity with that component or LDF.
 		Entity* closest = nullptr;
+		if (idParsed) closest = Game::entityManager->GetEntity(idParsed.value());
+		float closestDistance = 0.0f;
 
 		std::u16string ldf;
 
 		bool isLDF = false;
 
-		auto component = GeneralUtils::TryParse<eReplicaComponentType>(splitArgs[0]);
-		if (!component) {
-			component = eReplicaComponentType::INVALID;
+		if (!closest) closest = PlayerManager::GetPlayer(splitArgs[0]);
+		if (!closest) {
+			auto component = GeneralUtils::TryParse<eReplicaComponentType>(splitArgs[0]);
+			if (!component) {
+				component = eReplicaComponentType::INVALID;
 
-			ldf = GeneralUtils::UTF8ToUTF16(splitArgs[0]);
+				ldf = GeneralUtils::UTF8ToUTF16(splitArgs[0]);
 
-			isLDF = true;
-		}
-
-		auto reference = entity->GetPosition();
-
-		auto closestDistance = 0.0f;
-
-		const auto candidates = Game::entityManager->GetEntitiesByComponent(component.value());
-
-		for (auto* candidate : candidates) {
-			if (candidate->GetLOT() == 1 || candidate->GetLOT() == 8092) {
-				continue;
+				isLDF = true;
 			}
 
-			if (isLDF && !candidate->HasVar(ldf)) {
-				continue;
+			auto reference = entity->GetPosition();
+
+
+			const auto candidates = Game::entityManager->GetEntitiesByComponent(component.value());
+
+			for (auto* candidate : candidates) {
+				if (candidate->GetLOT() == 1 || candidate->GetLOT() == 8092) {
+					continue;
+				}
+
+				if (isLDF && !candidate->HasVar(ldf)) {
+					continue;
+				}
+
+				if (!closest) {
+					closest = candidate;
+
+					closestDistance = NiPoint3::Distance(candidate->GetPosition(), reference);
+
+					continue;
+				}
+
+				const auto distance = NiPoint3::Distance(candidate->GetPosition(), reference);
+
+				if (distance < closestDistance) {
+					closest = candidate;
+
+					closestDistance = distance;
+				}
 			}
-
-			if (!closest) {
-				closest = candidate;
-
-				closestDistance = NiPoint3::Distance(candidate->GetPosition(), reference);
-
-				continue;
-			}
-
-			const auto distance = NiPoint3::Distance(candidate->GetPosition(), reference);
-
-			if (distance < closestDistance) {
-				closest = candidate;
-
-				closestDistance = distance;
-			}
+		} else {
+			closestDistance = NiPoint3::Distance(entity->GetPosition(), closest->GetPosition());
 		}
 
 		if (!closest) return;
@@ -1740,7 +1790,7 @@ namespace DEVGMCommands {
 		}
 
 		const auto splitArgs = GeneralUtils::SplitString(args, ' ');
-		
+
 		// Prevent execute command recursion by checking if this is already an execute command
 		for (const auto& arg : splitArgs) {
 			if (arg == "execute" || arg == "exec") {
@@ -1748,51 +1798,51 @@ namespace DEVGMCommands {
 				return;
 			}
 		}
-		
+
 		// Context variables for execution
 		Entity* execEntity = entity;  // Entity to execute as
 		NiPoint3 execPosition = entity->GetPosition();  // Position to execute from
 		bool positionOverridden = false;
 		std::string finalCommand;
-		
+
 		// Parse subcommands
 		size_t i = 0;
 		while (i < splitArgs.size()) {
 			const std::string& subcommand = splitArgs[i];
-			
+
 			if (subcommand == "as") {
 				if (i + 1 >= splitArgs.size()) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: 'as' requires a player name");
 					return;
 				}
-				
+
 				const std::string& targetName = splitArgs[i + 1];
 				auto* targetPlayer = PlayerManager::GetPlayer(targetName);
 				if (!targetPlayer) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: Player '" + GeneralUtils::ASCIIToUTF16(targetName) + u"' not found");
 					return;
 				}
-				
+
 				execEntity = targetPlayer;
 				i += 2;
-				
+
 			} else if (subcommand == "at") {
 				if (i + 1 >= splitArgs.size()) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: 'at' requires a player name");
 					return;
 				}
-				
+
 				const std::string& targetName = splitArgs[i + 1];
 				auto* targetPlayer = PlayerManager::GetPlayer(targetName);
 				if (!targetPlayer) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: Player '" + GeneralUtils::ASCIIToUTF16(targetName) + u"' not found");
 					return;
 				}
-				
+
 				execPosition = targetPlayer->GetPosition();
 				positionOverridden = true;
 				i += 2;
-				
+
 			} else if (subcommand == "positioned") {
 				if (i + 3 >= splitArgs.size()) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: 'positioned' requires x, y, z coordinates");
@@ -1810,69 +1860,69 @@ namespace DEVGMCommands {
 
 				execPosition = NiPoint3(xOpt.value(), yOpt.value(), zOpt.value());
 				positionOverridden = true;
-				
+
 				i += 4;
-				
+
 			} else if (subcommand == "run") {
 				// Everything after "run" is the command to execute
 				if (i + 1 >= splitArgs.size()) {
 					ChatPackets::SendSystemMessage(sysAddr, u"Error: 'run' requires a command");
 					return;
 				}
-				
+
 				// Reconstruct the command from remaining args
 				for (size_t j = i + 1; j < splitArgs.size(); ++j) {
 					if (!finalCommand.empty()) finalCommand += " ";
 					finalCommand += splitArgs[j];
 				}
 				break;
-				
+
 			} else {
 				ChatPackets::SendSystemMessage(sysAddr, u"Error: Unknown subcommand '" + GeneralUtils::ASCIIToUTF16(subcommand) + u"'");
 				ChatPackets::SendSystemMessage(sysAddr, u"Valid subcommands: as, at, positioned, run");
 				return;
 			}
 		}
-		
+
 		if (finalCommand.empty()) {
 			ChatPackets::SendSystemMessage(sysAddr, u"Error: No command specified to run. Use 'run <command>' at the end.");
 			return;
 		}
-		
+
 		// Validate that the command starts with a valid character
 		if (finalCommand.empty() || finalCommand[0] == '/') {
 			ChatPackets::SendSystemMessage(sysAddr, u"Error: Command should not start with '/'. Just specify the command name.");
 			return;
 		}
-		
+
 		// Store original position if we need to restore it
 		NiPoint3 originalPosition;
 		bool needToRestore = false;
-		
+
 		if (positionOverridden && execEntity == entity) {
 			// If we're executing as ourselves but from a different position,
 			// temporarily move the entity
 			originalPosition = entity->GetPosition();
 			needToRestore = true;
-			
+
 			// Set the position temporarily for the command execution
 			auto* controllable = entity->GetComponent<ControllablePhysicsComponent>();
 			if (controllable) {
 				controllable->SetPosition(execPosition);
 			}
 		}
-		
+
 		// Provide feedback about what we're executing
 		std::string execAsName = execEntity->GetCharacter() ? execEntity->GetCharacter()->GetName() : "Unknown";
-		ChatPackets::SendSystemMessage(sysAddr, u"[Execute] Running as '" + GeneralUtils::ASCIIToUTF16(execAsName) + 
-										u"' from <" + GeneralUtils::to_u16string(execPosition.x) + u", " + 
-										GeneralUtils::to_u16string(execPosition.y) + u", " + 
-										GeneralUtils::to_u16string(execPosition.z) + u">: /" + 
-										GeneralUtils::ASCIIToUTF16(finalCommand));
-		
+		ChatPackets::SendSystemMessage(sysAddr, u"[Execute] Running as '" + GeneralUtils::ASCIIToUTF16(execAsName) +
+			u"' from <" + GeneralUtils::to_u16string(execPosition.x) + u", " +
+			GeneralUtils::to_u16string(execPosition.y) + u", " +
+			GeneralUtils::to_u16string(execPosition.z) + u">: /" +
+			GeneralUtils::ASCIIToUTF16(finalCommand));
+
 		// Execute the command through the slash command handler
 		SlashCommandHandler::HandleChatCommand(GeneralUtils::ASCIIToUTF16("/" + finalCommand), execEntity, sysAddr);
-		
+
 		// Restore original position if needed
 		if (needToRestore) {
 			auto* controllable = entity->GetComponent<ControllablePhysicsComponent>();

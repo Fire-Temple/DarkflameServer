@@ -215,6 +215,10 @@ public:
 	 */
 	int GetActivityID() { return m_ActivityInfo.ActivityID; }
 
+	// Whether or not team loot should be dropped on death for this activity
+	// if true, and a player is supposed to get loot, they are skipped
+	bool GetNoTeamLootOnDeath() const { return m_ActivityInfo.noTeamLootOnDeath; }
+
 	/**
 	 * Returns if this activity has a lobby, e.g. if it needs to instance players to some other map
 	 * @return true if this activity has a lobby, false otherwise
@@ -341,19 +345,13 @@ public:
 	 */
 	void SetInstanceMapID(uint32_t mapID) { m_ActivityInfo.instanceMapID = mapID; };
 
-	/**
-	 * Returns the LMI that this activity points to for a team size
-	 * @param teamSize the team size to get the LMI for
-	 * @return the LMI that this activity points to for a team size
-	 */
-	uint32_t GetLootMatrixForTeamSize(uint32_t teamSize) { return m_ActivityLootMatrices[teamSize]; }
 private:
 
 	bool OnGetObjectReportInfo(GameMessages::GameMsg& msg);
 	/**
 	 * The database information for this activity
 	 */
-	CDActivities m_ActivityInfo;
+	CDActivities m_ActivityInfo{};
 
 	/**
 	 * All the active instances of this activity
@@ -369,11 +367,6 @@ private:
 	 * All the activity score for the players in this activity
 	 */
 	std::vector<ActivityPlayer*> m_ActivityPlayers;
-
-	/**
-	 * LMIs for team sizes
-	 */
-	std::unordered_map<uint32_t, uint32_t> m_ActivityLootMatrices;
 
 	/**
 	 * The activity id

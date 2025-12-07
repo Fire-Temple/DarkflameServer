@@ -719,8 +719,9 @@ private:
 	 * NOTE: quick as there's no DB lookups
 	 */
 	void DoQuickXMLDataParse();
-	
-	
+public:
+	const decltype(m_PlayerFlags)& GetPlayerFlags() const { return m_PlayerFlags; }
+	const decltype(m_SessionFlags)& GetSessionFlags() const { return m_SessionFlags; }
 };
 
 extern std::map<uint32_t, ZoneType> zoneTypeMap;

@@ -14,7 +14,7 @@
 #include "Database.h"
 #include "DluAssert.h"
 
-ModelComponent::ModelComponent(Entity* parent) : Component(parent) {
+ModelComponent::ModelComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	using namespace GameMessages;
 	m_OriginalPosition = m_Parent->GetDefaultPosition();
 	m_OriginalRotation = m_Parent->GetDefaultRotation();
@@ -24,23 +24,27 @@ ModelComponent::ModelComponent(Entity* parent) : Component(parent) {
 	m_userModelID = m_Parent->GetVarAs<LWOOBJID>(u"userModelID");
 	RegisterMsg<RequestUse>(this, &ModelComponent::OnRequestUse);
 	RegisterMsg<ResetModelToDefaults>(this, &ModelComponent::OnResetModelToDefaults);
+	RegisterMsg<GetObjectReportInfo>(this, &ModelComponent::OnGetObjectReportInfo);
 }
 
 bool ModelComponent::OnResetModelToDefaults(GameMessages::GameMsg& msg) {
 	auto& reset = static_cast<GameMessages::ResetModelToDefaults&>(msg);
-	for (auto& behavior : m_Behaviors) behavior.HandleMsg(reset);
-	GameMessages::UnSmash unsmash;
-	unsmash.target = GetParent()->GetObjectID();
-	unsmash.duration = 0.0f;
-	unsmash.Send(UNASSIGNED_SYSTEM_ADDRESS);
+	if (reset.bResetBehaviors) for (auto& behavior : m_Behaviors) behavior.HandleMsg(reset);
 
-	m_Parent->SetPosition(m_OriginalPosition);
-	m_Parent->SetRotation(m_OriginalRotation);
+	if (reset.bUnSmash) {
+		GameMessages::UnSmash unsmash;
+		unsmash.target = GetParent()->GetObjectID();
+		unsmash.duration = 0.0f;
+		unsmash.Send(UNASSIGNED_SYSTEM_ADDRESS);
+		m_NumActiveUnSmash = 0;
+	}
+
+	if (reset.bResetPos) m_Parent->SetPosition(m_OriginalPosition);
+	if (reset.bResetRot) m_Parent->SetRotation(m_OriginalRotation);
 	m_Parent->SetVelocity(NiPoint3Constant::ZERO);
 
 	m_Speed = 3.0f;
 	m_NumListeningInteract = 0;
-	m_NumActiveUnSmash = 0;
 
 	m_NumActiveAttack = 0;
 	GameMessages::SetFaction set{};
@@ -337,4 +341,20 @@ void ModelComponent::RemoveAttack() {
 		set.bIgnoreChecks = true; // Remove the attack faction
 		set.Send();
 	}
+}
+
+bool ModelComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
+	auto& reportMsg = static_cast<GameMessages::GetObjectReportInfo&>(msg);
+	if (!reportMsg.info) return false;
+	auto& cmptInfo = reportMsg.info->PushDebug("Model Behaviors (Mutable)");
+	cmptInfo.PushDebug<AMFIntValue>("Component ID") = GetComponentID();
+
+	cmptInfo.PushDebug<AMFStringValue>("Name") = "Objects_" + std::to_string(m_Parent->GetLOT()) + "_name";
+	cmptInfo.PushDebug<AMFBoolValue>("Has Unique Name") = false;
+	cmptInfo.PushDebug<AMFStringValue>("UGID (from item)") = std::to_string(m_userModelID);
+	cmptInfo.PushDebug<AMFStringValue>("UGID") = std::to_string(m_userModelID);
+	cmptInfo.PushDebug<AMFStringValue>("Description") = "";
+	cmptInfo.PushDebug<AMFIntValue>("Behavior Count") = m_Behaviors.size();
+
+	return true;
 }

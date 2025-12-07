@@ -911,10 +911,10 @@ void SlashCommandHandler::Startup() {
 
 	Command GmInvisCommand{
 		.help = "Toggles invisibility for the character",
-		.info = "Toggles invisibility for the character, though it's currently a bit buggy. Requires nonzero GM Level for the character, but the account must have a GM level of 8",
+		.info = "Toggles invisibility for the character, making them invisible to other players and lower GM levels",
 		.aliases = { "gminvis" },
 		.handle = GMGreaterThanZeroCommands::GmInvis,
-		.requiredLevel = eGameMasterLevel::DEVELOPER
+		.requiredLevel = eGameMasterLevel::FORUM_MODERATOR
 	};
 	RegisterCommand(GmInvisCommand);
 
@@ -1070,7 +1070,7 @@ void SlashCommandHandler::Startup() {
 		.info = "Resurrects the player",
 		.aliases = { "resurrect" },
 		.handle = GMZeroCommands::Resurrect,
-		.requiredLevel = eGameMasterLevel::CIVILIAN
+		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
 	RegisterCommand(ResurrectCommand);
 
