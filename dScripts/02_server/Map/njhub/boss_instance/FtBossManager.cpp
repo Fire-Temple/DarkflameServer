@@ -8,19 +8,18 @@
 #include "BaseCombatAIComponent.h"
 #include "MissionComponent.h"
 #include "eMissionTaskType.h"
+#include "PlayerManager.h"
 
-Entity* FtBossManager::player1 = nullptr;
-Entity* FtBossManager::player2 = nullptr;
-Entity* FtBossManager::player3 = nullptr;
-Entity* FtBossManager::player4 = nullptr;
+#include <random>
 
 Entity* FtBossManager::randomPlayer = nullptr;
+
+std::mt19937 rng;
 
 void FtBossManager::OnStartup(Entity* self) {
 	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
 	
 	self->SetProximityRadius(160, "Start_Radius");	
-	self->SetProximityRadius(4500, "Zone_Radius");	
 	self->SetProximityRadius(130, "Combat_Radius");		
 	
 	LargeTeam = 1;
@@ -36,36 +35,7 @@ void FtBossManager::OnCollisionPhantom(Entity* self, Entity* target) {
 
 void FtBossManager::OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) {
 	
-	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();		
-
-	if (name == "Zone_Radius") {	
-		if (entering->IsPlayer()) {
-//		collect & store player entities	
-			if (entering != player1 && entering != player2 && entering != player3 && entering != player4) {	
-				
-				if (!player1) {
-					player1 = entering;
-					self->SetVar<LWOOBJID>(u"playerid1", entering->GetObjectID());
-					PlayerCount++;					
-				} else if (!player2) {
-					player2 = entering;	
-					self->SetVar<LWOOBJID>(u"playerid2", entering->GetObjectID());	
-					PlayerCount++;					
-				} else if (!player3) {
-					player3 = entering;
-					self->SetVar<LWOOBJID>(u"playerid3", entering->GetObjectID());	
-					PlayerCount++;						
-				} else if (!player4) {
-					player4 = entering;
-					self->SetVar<LWOOBJID>(u"playerid4", entering->GetObjectID());
-					PlayerCount++;					
-				}
-			}				
-			
-			
-		}	
-	}
-
+	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
 	if (name == "Start_Radius") {
 
 		
@@ -98,12 +68,17 @@ void FtBossManager::OnProximityUpdate(Entity* self, Entity* entering, std::strin
 				bStarted = 1;
 			}	
 			
-
+//			Assign Garmadon Chest loot at this point
+			const auto GarmadonChest = Game::entityManager->GetEntitiesByLOT(16842);
+			auto ChestPlayerCount = self->GetVar<int>(u"playercount");
+			for (auto* chest : GarmadonChest) {
+				chest->SetVar<int>(u"playercount", ChestPlayerCount);	
+			}	
 
 //			Generate new seed for rng
 			double randomPos = entering->GetPosition().x; 
-			unsigned int seed = static_cast<unsigned int>(randomPos * 1000000); // Convert to int
-			srand(seed);
+			unsigned int seed = static_cast<unsigned int>(randomPos * 700000); // Convert to int
+			rng.seed(seed);
 
 
 
@@ -131,8 +106,7 @@ void FtBossManager::PlayCelebration(Entity* self, int cutscene) {
 	}
 	
 	
-    Entity* playerEntities[] = {player1, player2, player3, player4};	
-    for (Entity* player : playerEntities) {	
+    for (auto* player : PlayerManager::GetAllPlayers()) {	
 		if (player != nullptr) {
 			auto* buffComponent = player->GetComponent<BuffComponent>();			
 //			Clear poison first		
@@ -143,9 +117,8 @@ void FtBossManager::PlayCelebration(Entity* self, int cutscene) {
 			
 			if (cutscene == 26) {
 				GameMessages::SendStartCelebrationEffect(player, player->GetSystemAddress(), 26);							
-			}	
-			
-			if (cutscene == 27) {			
+			}				
+			else if (cutscene == 27) {			
 				GameMessages::SendStartCelebrationEffect(player, player->GetSystemAddress(), 27);
 	
 	
@@ -164,9 +137,7 @@ void FtBossManager::PlayCelebration(Entity* self, int cutscene) {
 
 	if (cutscene == 26) {				
 		self->AddTimer("Celebration26Completed", 19.5f);					
-	}	
-			
-	if (cutscene == 27) {			
+	} else if (cutscene == 27) {			
 		self->AddTimer("Celebration27Completed", 13.9f);	
 	}	
 	
@@ -176,53 +147,36 @@ void FtBossManager::TeleportPlayers(Entity* self) {
 	
 //	Player spawns
 
-    NiPoint3 pos1{};
-    pos1.SetX(-2235.25);  
-    pos1.SetY(264.137);  
-    pos1.SetZ(-475);  		
-	
-    NiPoint3 pos2{};
-    pos2.SetX(-2220.75);  
-    pos2.SetY(264.137);  
-    pos2.SetZ(-475);  	
+	NiPoint3 positions[] = {
+		[]{ NiPoint3 p{}; p.SetX(-2235.25); p.SetY(264.137); p.SetZ(-475); return p; }(),
+		[]{ NiPoint3 p{}; p.SetX(-2220.75); p.SetY(264.137); p.SetZ(-475); return p; }(),
+		[]{ NiPoint3 p{}; p.SetX(-2257.5); p.SetY(264.137); p.SetZ(-479); return p; }(),
+		[]{ NiPoint3 p{}; p.SetX(-2200.5); p.SetY(264.137); p.SetZ(-479); return p; }()
+	};
+	NiPoint3 RespawnPos{};
+	RespawnPos.SetX(-2228.2815);  
+	RespawnPos.SetY(280.3420);  
+	RespawnPos.SetZ(-374.2848); 
 
-    NiPoint3 pos3{};
-    pos3.SetX(-2257.5);  
-    pos3.SetY(264.137);  
-    pos3.SetZ(-479); 	
+	size_t index = 0;
+	const size_t totalPositions = std::size(positions);
 
-    NiPoint3 pos4{};
-    pos4.SetX(-2200.5);  
-    pos4.SetY(264.137);  
-    pos4.SetZ(-479);  
-	
-    NiPoint3 TestPos{};
-    TestPos.SetX(-2228.2815);  
-    TestPos.SetY(280.3420);  
-    TestPos.SetZ(-374.2848); 		
-	
-//	Teleport players to proper positions
-	if (player1 != nullptr) {	
-		GameMessages::SendTeleport(player1->GetObjectID(), pos1, self->GetRotation(), player1->GetSystemAddress(), 
-		true);	
-		
-		GameMessages::SendPlayerReachedRespawnCheckpoint(player1, TestPos, self->GetRotation());		
-	} if (player2 != nullptr) {		
-		GameMessages::SendTeleport(player2->GetObjectID(), pos2, self->GetRotation(), player2->GetSystemAddress(), 
-		true);	
-		
-		GameMessages::SendPlayerReachedRespawnCheckpoint(player2, TestPos, self->GetRotation());				
-	} if (player3 != nullptr) {		
-		GameMessages::SendTeleport(player3->GetObjectID(), pos3, self->GetRotation(), player3->GetSystemAddress(), 
-		true);	
-		
-		GameMessages::SendPlayerReachedRespawnCheckpoint(player3, TestPos, self->GetRotation());				
-	} if (player4 != nullptr) {			
-		GameMessages::SendTeleport(player4->GetObjectID(), pos4, self->GetRotation(), player4->GetSystemAddress(),
-		true);	
-
-		GameMessages::SendPlayerReachedRespawnCheckpoint(player4, TestPos, self->GetRotation());				
-	}
+	for (auto* player : PlayerManager::GetAllPlayers()) {
+		if (player != nullptr) {
+			GameMessages::SendTeleport(
+				player->GetObjectID(),
+				positions[index],
+				self->GetRotation(),
+				player->GetSystemAddress(),
+				true
+			);
+//			Cycle positions
+			index = (index + 1) % totalPositions;
+			
+//			Handle respawn point
+			GameMessages::SendPlayerReachedRespawnCheckpoint(player, RespawnPos, self->GetRotation());
+		}
+	}		
 }
 
 void FtBossManager::StartElement(Entity* self, std::string elementString) {
@@ -309,8 +263,7 @@ void FtBossManager::PlayerHitPortal(Entity* self, std::string element) {
 	const auto NodeStr = std::to_wstring(nextNode + 1);	
 	
 //		Play correct cine
-		Entity* playerEntities[] = {player1, player2, player3, player4};
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 			
 				std::u16string cinematicName = u"Boss_RailPedestal_0";
@@ -339,8 +292,7 @@ void FtBossManager::StartNewWave(Entity* self) {
 	if (waveNum != 4) {
 		
 //		Play cines	
-		Entity* playerEntities[] = {player1, player2, player3, player4};
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 			
 				GameMessages::SendPlayCinematic(player->GetObjectID(), u"BossSpawnWaveCam", 
@@ -372,8 +324,7 @@ void FtBossManager::StartNewWave(Entity* self) {
 		PlayCelebration(self, 27);
 
 //		Prevent cam glitch with celebration
-		Entity* playerEntities[] = {player1, player2, player3, player4};
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 				for (int i = 1; i <= 6; ++i) {
 					std::wstring num = std::to_wstring(i);
@@ -689,17 +640,14 @@ int32_t param1, int32_t param2) {
 
 
 void FtBossManager::OnPlayerExit(Entity* self, Entity* player) {
-	PlayerCount--;
-	
 	self->SetNetworkVar<LWOOBJID>(u"PlayerLeft", player->GetObjectID());				
 }
 
 void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
-	Entity* playerEntities[] = {player1, player2, player3, player4};	
 	
 	
 	if (timerName == "Celebration26Completed") {
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 			
 				GameMessages::SendPlayCinematic(player->GetObjectID(), u"BossStartCam", 
@@ -721,7 +669,7 @@ void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
 //		Switch music	
 		self->SetNetworkVar(u"BossMusicStart", 1);
 	
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 			
 				GameMessages::SendPlayCinematic(player->GetObjectID(), u"BossLGCam", 
@@ -826,10 +774,9 @@ void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
 		pauseMortar = true;
 		
 //		Play cines for portal spawn
-		Entity* playerEntities[] = {player1, player2, player3, player4};
 		std::u16string uCurrentElement(CurrentElement.begin(), CurrentElement.end());	
 		
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 				
 //				Clear poison				
@@ -861,8 +808,7 @@ void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
 //		ring ring some dude with a tophat needs you back
 //		Ah shit, here we go again	
 
-		Entity* playerEntities[] = {player1, player2, player3, player4};
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {
 				
 //				Clear poison					
@@ -995,8 +941,7 @@ void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
 		}	
 		
 //		Play bouncer cine
-		Entity* playerEntities[] = {player1, player2, player3, player4};
-		for (Entity* player : playerEntities) {	
+		for (auto* player : PlayerManager::GetAllPlayers()) {
 			if (player != nullptr) {          
 //				Clear poison				
 				auto* buffComponent = player->GetComponent<BuffComponent>();
@@ -1035,56 +980,36 @@ void FtBossManager::OnTimerDone(Entity* self, std::string timerName) {
 
 void FtBossManager::SpawnMortar(Entity* self, const std::string& loc) {
 
-    if (pauseMortar == true) {
+    if (pauseMortar)
         return;
-    }
 
+    randomPlayer = nullptr;
 
-	randomPlayerNum = 0;
-
-
-    std::vector<int> playersInGame;
-
-
-    if (player1 != nullptr) {
-        playersInGame.push_back(1);
-    }
-    if (player2 != nullptr) {
-        playersInGame.push_back(2);
-    }
-    if (player3 != nullptr) {
-        playersInGame.push_back(3);
-    }
-    if (player4 != nullptr) {
-        playersInGame.push_back(4);
-    }
-
-    if (!playersInGame.empty()) {
-
-        
-
-        int randomIndex = rand() % playersInGame.size();
-        randomPlayerNum = playersInGame[randomIndex];
-
-
-    }
-
-	if (randomPlayerNum = 0) {
-		randomPlayer = nullptr;		
-	} else if (randomPlayerNum = 1) {
-		randomPlayer = player1;		
-	} else if (randomPlayerNum = 2) {
-		randomPlayer = player2;		
-	} else if (randomPlayerNum = 3) {
-		randomPlayer = player3;
-	} else if (randomPlayerNum = 4) {
-		randomPlayer = player4;
-	}	
-
-    if (randomPlayer == nullptr) {
+    auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
+    if (!proximityMonitorComponent)
         return;
+
+    std::vector<Entity*> playersInRange;
+
+    for (auto* player : PlayerManager::GetAllPlayers()) {
+        if (player &&
+            proximityMonitorComponent->IsInProximity("Combat_Radius", player->GetObjectID()))
+        {
+            playersInRange.push_back(player);
+        }
     }
+
+// 	Select random player
+    if (!playersInRange.empty()) {
+        std::uniform_int_distribution<> dist(0, playersInRange.size() - 1);
+        randomPlayer = playersInRange[dist(rng)];
+    }
+
+    if (!randomPlayer)
+        return;
 	
+	
+//	Spawn the actual mortar
 	
 	auto pos = self->GetPosition();
 	auto rot = self->GetRotation();

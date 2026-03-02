@@ -1357,7 +1357,8 @@ void HandlePacket(Packet* packet) {
 			}
 		}
 
-		const auto segments = Game::chatFilter->IsSentenceOkay(request.message, entity->GetGMLevel(), !(isBestFriend && request.chatLevel == 1));
+		auto segments = Game::chatFilter->IsSentenceOkay(request.message, entity->GetGMLevel(), !(isBestFriend && request.chatLevel == 1));
+		if (Game::config->GetValue("disable_chat_filter") == "1") segments = { };
 
 		bool bAllClean = segments.empty();
 
@@ -1390,6 +1391,7 @@ void HandlePacket(Packet* packet) {
 			std::string playerName = user->GetLastUsedChar()->GetName();
 			bool isMythran = user->GetLastUsedChar()->GetGMLevel() > eGameMasterLevel::CIVILIAN;
 			bool isOk = Game::chatFilter->IsSentenceOkay(GeneralUtils::UTF16ToWTF8(chatMessage.message), user->GetLastUsedChar()->GetGMLevel()).empty();
+			if (Game::config->GetValue("disable_chat_filter") == "1") isOk = true;
 			LOG_DEBUG("Msg: %s was approved previously? %i", GeneralUtils::UTF16ToWTF8(chatMessage.message).c_str(), user->GetLastChatMessageApproved());
 			if (!isOk) return;
 			if (!isOk && !isMythran) return;

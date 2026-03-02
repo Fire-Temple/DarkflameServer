@@ -10,12 +10,8 @@
 #include "RenderComponent.h"
 #include "BuffComponent.h"
 #include "BaseCombatAIComponent.h"
+#include "PlayerManager.h"
 
-// Initialize defaults
-Entity* FtWavesManager::engaged1 = nullptr;
-Entity* FtWavesManager::engaged2 = nullptr;
-Entity* FtWavesManager::engaged3 = nullptr;
-Entity* FtWavesManager::engaged4 = nullptr;
 
 
 
@@ -30,38 +26,13 @@ void FtWavesManager::OnStartup(Entity* self) {
 
 	LargeGroup = 1;
 	
-	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();	
-	self->SetProximityRadius(4500, "Area_Radius");	
+	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
 	self->SetProximityRadius(150, "Room_Radius");
 
 
 
 	if (self->GetVar<int>(u"playercount") == 1) {
 		LargeGroup = 0;
-	}
-}
-
-void FtWavesManager::OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) {	
-	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();		
-	if (name == "Area_Radius") {	
-		if (entering->IsPlayer()) {
-//		collect & store player entities for cines	
-			if (entering != engaged1 && entering != engaged2 && entering != engaged3 && entering != engaged4) {	
-				if (!engaged1) {
-					engaged1 = entering;
-					self->SetVar(u"playerid1", entering->GetObjectID());					
-				} else if (!engaged2) {
-					engaged2 = entering;	
-					self->SetVar(u"playerid2", entering->GetObjectID());							
-				} else if (!engaged3) {
-					engaged3 = entering;
-					self->SetVar(u"playerid3", entering->GetObjectID());							
-				} else if (!engaged4) {
-					engaged4 = entering;
-					self->SetVar(u"playerid4", entering->GetObjectID());							
-				}
-			}	
-		}
 	}
 }
 
@@ -83,49 +54,42 @@ void FtWavesManager::OnCollisionPhantom(Entity* self, Entity* target) {
 		}
 //		end	
 	
-		ActivateWaveSpinners(self);	
+		ActivateWaveSpinners(self, target);	
 	}	
 }
 
-void FtWavesManager::OnFireEventServerSide(Entity* self, Entity* sender, std::string args, int32_t param1, int32_t param2,
-int32_t param3) {
-	
-	
-}
-
-void FtWavesManager::ActivateWaveSpinners(Entity* self) {
+void FtWavesManager::ActivateWaveSpinners(Entity* self, Entity* target) {
 
 	if (WaveNum == 4) {
 		return;
 	}
 			
 
-//	Cinematic stuff		
-    Entity* engagedEntities[] = {engaged1, engaged2, engaged3, engaged4};
+//	Cinematic stuff
+	
+	else if (WaveNum == 1 && target != nullptr) {
+		GameMessages::SendPlayCinematic(target->GetObjectID(), u"WavesSpawnerSpinners", 
+		target->GetSystemAddress());	
+	}
 	
 	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();	
-    for (Entity* engaged : engagedEntities) {
-        if (engaged != nullptr && proximityMonitorComponent->IsInProximity("Room_Radius", engaged->GetObjectID())
-			&& WaveNum != 3) {
-            auto* buffComponent = engaged->GetComponent<BuffComponent>();
-            if (buffComponent != nullptr) {
-                buffComponent->RemoveBuff(60);
-            }
-
-			GameMessages::SendPlayCinematic(engaged->GetObjectID(), u"WavesSpawnerSpinners", 
-			engaged->GetSystemAddress());
-
-		} else if (engaged != nullptr && proximityMonitorComponent->IsInProximity("Area_Radius", engaged->GetObjectID())
-			&& WaveNum == 3) {
+	for (auto* engaged : PlayerManager::GetAllPlayers()) {		
+		if (engaged != nullptr) {		
+			auto* buffComponent = engaged->GetComponent<BuffComponent>();
+			if (buffComponent != nullptr) {
+				buffComponent->RemoveBuff(60);
+			}	
+			
+			if (WaveNum == 2 && proximityMonitorComponent->IsInProximity("Room_Radius", engaged->GetObjectID())) {
 				
-            auto* buffComponent = engaged->GetComponent<BuffComponent>();
-            if (buffComponent != nullptr) {
-                buffComponent->RemoveBuff(60);
-            }
+				GameMessages::SendPlayCinematic(engaged->GetObjectID(), u"WavesSpawnerSpinners", 
+				engaged->GetSystemAddress());
+			} else if (WaveNum == 3) {
 
-			GameMessages::SendPlayCinematic(engaged->GetObjectID(), u"Waves_Wave3Cam_1", 
-			engaged->GetSystemAddress());	
-			self->AddTimer("MusicOff", 1);		
+				GameMessages::SendPlayCinematic(engaged->GetObjectID(), u"Waves_Wave3Cam_1", 
+				engaged->GetSystemAddress());	
+				self->AddTimer("MusicOff", 1);		
+			}
 		}
     }
 //	End
@@ -311,9 +275,7 @@ void FtWavesManager::CheckWaveProgress(Entity* self) {
 
 //		Clear poison while collecting loot	
 		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();	
-		Entity* engagedEntities[] = {engaged1, engaged2, engaged3, engaged4};
-
-		for (Entity* engaged : engagedEntities) {
+		for (auto* engaged : PlayerManager::GetAllPlayers()) {
 			if (engaged != nullptr && proximityMonitorComponent->IsInProximity("Room_Radius", engaged->GetObjectID())) {
 				auto* buffComponent = engaged->GetComponent<BuffComponent>();
 				if (buffComponent != nullptr) {
@@ -333,10 +295,9 @@ void FtWavesManager::CheckWaveProgress(Entity* self) {
 		
 		self->SetNetworkVar(u"wave4", 1);			
 		
+//		Clear poison		
 		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();	
-		Entity* engagedEntities[] = {engaged1, engaged2, engaged3, engaged4};
-
-		for (Entity* engaged : engagedEntities) {
+		for (auto* engaged : PlayerManager::GetAllPlayers()) {
 			if (engaged != nullptr && proximityMonitorComponent->IsInProximity("Room_Radius", engaged->GetObjectID())) {
 				auto* buffComponent = engaged->GetComponent<BuffComponent>();
 				if (buffComponent != nullptr) {
@@ -350,15 +311,13 @@ void FtWavesManager::CheckWaveProgress(Entity* self) {
 
 
 void FtWavesManager::OnTimerDone(Entity* self, std::string timerName) {
-	Entity* playerEntities[] = {engaged1, engaged2, engaged3, engaged4};	
 	
 	if (timerName == "ShowDoor") {
 		
 //		More cinematic stuff
 		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
-		Entity* engagedEntities[] = {engaged1, engaged2, engaged3, engaged4};
 
-		for (Entity* engaged : engagedEntities) {
+		for (auto* engaged : PlayerManager::GetAllPlayers()) {	
 			if (engaged != nullptr && proximityMonitorComponent->IsInProximity("Room_Radius", engaged->GetObjectID())) {
 				auto* buffComponent = engaged->GetComponent<BuffComponent>();
 				if (buffComponent != nullptr) {
@@ -418,7 +377,7 @@ void FtWavesManager::OnTimerDone(Entity* self, std::string timerName) {
 			WaveNum = 4;		
 		}
 	} else if (timerName == "SpawnNextWave") {
-		ActivateWaveSpinners(self);			
+		ActivateWaveSpinners(self, nullptr);			
 	
 	} else if (timerName == "SpinnersDown") {
 		if (HandSpinnerUp == 1) {	
@@ -807,58 +766,40 @@ void FtWavesManager::OnTimerDone(Entity* self, std::string timerName) {
 //		Move to client to handle		
 		self->SetNetworkVar(u"stopmusic", 1);		
 	} else if (timerName == "TelePlayers") {
-	
-		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();	
 		
 //		Handle player spawns for wave 3
 
-		NiPoint3 pos1{};
-		pos1.SetX(-1223);  
-		pos1.SetY(358);  
-		pos1.SetZ(-166);  		
-		
-		NiPoint3 pos2{};
-		pos2.SetX(-1233);  
-		pos2.SetY(358);  
-		pos2.SetZ(-166);  	
+		NiPoint3 positions[] = {
+			[]{ NiPoint3 p{}; p.SetX(-1223); p.SetY(358); p.SetZ(-166); return p; }(),
+			[]{ NiPoint3 p{}; p.SetX(-1233); p.SetY(358); p.SetZ(-166); return p; }(),
+			[]{ NiPoint3 p{}; p.SetX(-1239); p.SetY(358); p.SetZ(-169); return p; }(),
+			[]{ NiPoint3 p{}; p.SetX(-1219); p.SetY(358); p.SetZ(-169); return p; }()
+		};
+		NiPoint3 RespawnPos{};
+		RespawnPos.SetX(-1228.7377);  
+		RespawnPos.SetY(358.1340);  
+		RespawnPos.SetZ(-273.6017); 
 
-		NiPoint3 pos3{};
-		pos3.SetX(-1239);  
-		pos3.SetY(358);  
-		pos3.SetZ(-169); 	
+		size_t index = 0;
+		const size_t totalPositions = std::size(positions);
 
-		NiPoint3 pos4{};
-		pos4.SetX(-1219);  
-		pos4.SetY(358);  
-		pos4.SetZ(-169);  
-		
-		NiPoint3 TestPos{};
-		TestPos.SetX(-1228.7377);  
-		TestPos.SetY(358.1340);  
-		TestPos.SetZ(-273.6017); 	
-		
+		for (auto* engaged : PlayerManager::GetAllPlayers()) {
+			if (engaged != nullptr && WaveNum == 3) {
+				GameMessages::SendTeleport(
+					engaged->GetObjectID(),
+					positions[index],
+					self->GetRotation(),
+					engaged->GetSystemAddress(),
+					true
+				);
 
-		if (engaged1 != nullptr && proximityMonitorComponent->IsInProximity("Area_Radius", engaged1->GetObjectID())
-		&& WaveNum == 3) {	
-			GameMessages::SendTeleport(engaged1->GetObjectID(), pos1, self->GetRotation(), engaged1->GetSystemAddress(), true);
-
-			GameMessages::SendPlayerReachedRespawnCheckpoint(engaged1, TestPos, self->GetRotation());		
-		} if (engaged2 != nullptr && proximityMonitorComponent->IsInProximity("Area_Radius", engaged2->GetObjectID())
-		&& WaveNum == 3) {		
-			GameMessages::SendTeleport(engaged2->GetObjectID(), pos2, self->GetRotation(), engaged2->GetSystemAddress(), true);
-
-			GameMessages::SendPlayerReachedRespawnCheckpoint(engaged2, TestPos, self->GetRotation());		
-		} if (engaged3 != nullptr && proximityMonitorComponent->IsInProximity("Area_Radius", engaged3->GetObjectID())
-		&& WaveNum == 3) {		
-			GameMessages::SendTeleport(engaged3->GetObjectID(), pos3, self->GetRotation(), engaged3->GetSystemAddress(), true);
-
-			GameMessages::SendPlayerReachedRespawnCheckpoint(engaged3, TestPos, self->GetRotation());		
-		} if (engaged4 != nullptr && proximityMonitorComponent->IsInProximity("Area_Radius", engaged4->GetObjectID())
-		&& WaveNum == 3) {			
-			GameMessages::SendTeleport(engaged4->GetObjectID(), pos4, self->GetRotation(), engaged4->GetSystemAddress(), true);
-
-			GameMessages::SendPlayerReachedRespawnCheckpoint(engaged4, TestPos, self->GetRotation());
-		}		
+//				Cycle positions
+				index = (index + 1) % totalPositions;
+				
+//				Handle respawn point
+				GameMessages::SendPlayerReachedRespawnCheckpoint(engaged, RespawnPos, self->GetRotation());
+			}
+		}	
 	}
 }
 
