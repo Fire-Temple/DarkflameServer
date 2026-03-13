@@ -177,6 +177,7 @@ MovingPlatformComponent::~MovingPlatformComponent() {
 }
 
 void MovingPlatformComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) {
+	// Still no need to serialize
 
 	if (!m_Serialize) {
 		outBitStream.Write<bool>(false);

@@ -305,7 +305,7 @@ private:
 	/**
 	 * Whether to serialize the entity on the next update
 	 */
-	bool m_Serialize = true;
+	bool m_Serialize = false;
 	
 	/**
 	 * hardcoded CallbackTimer ids, component id + incremental per function or whatever we need
