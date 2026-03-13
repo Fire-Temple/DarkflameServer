@@ -14,10 +14,10 @@ void SpinnerSeesaw::OnStartup(Entity* self) {
 	
 	self->SetProximityRadius(3.5, "spin_distance");		
 	
-	if (self->GetVar<bool>(u"platformStartAtEnd")) {
-		self->AddTimer("MoveUp", 26);		
-	} else {
-		self->AddTimer("MoveDown", 26);			
+	if (!self->GetVar<bool>(u"platformStartAtEnd")) {	
+		SpawnLegs(self);
+		self->SetNetworkVar(u"bIsInUse", false);
+		self->SetVar(u"bActive", true);	
 	}	
 }
 
@@ -67,16 +67,16 @@ void SpinnerSeesaw::OnSkillEventFired(Entity* self, Entity* caster, const std::s
 //	Check if timed
 	auto ResetTime = self->GetVar<int32_t>(u"reset_time");
 	if (ResetTime >= 1) {	
-		self->AddTimer("ResetPair", ResetTime + 2.5);	
-//		2.5 = rough estimate of movetime for platforms		
+		self->AddTimer("ResetPair", ResetTime + 2);	
+//		give a little extra time	
 	}
 	
 	SpinnerAscend(self);	
 }
 
 void SpinnerSeesaw::SpinnerAscend(Entity* self) {	
-	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(1);
 	RenderComponent::PlayAnimation(self, u"up");
 	
 //	Ascend sfx
@@ -84,16 +84,16 @@ void SpinnerSeesaw::SpinnerAscend(Entity* self) {
 }	
 	
 void SpinnerSeesaw::SpinnerDescend(Entity* self) {	
-
 	self->CancelTimer("ResetPair");
-
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);		
+	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(0);	
 	RenderComponent::PlayAnimation(self, u"down");
 	
 //	Descend sfx		
 	GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{97b60c03-51f2-45b6-80cc-ccbbef0d94cf}");		
 
-	self->AddTimer("Unlock", 4);		
+	self->AddTimer("Unlock", 2);		
 }
 
 void SpinnerSeesaw::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1,
@@ -111,14 +111,7 @@ void SpinnerSeesaw::OnNotifyObject(Entity* self, Entity* sender, const std::stri
 }		
 
 void SpinnerSeesaw::OnTimerDone(Entity* self, std::string timerName) {
-		
-	if (timerName == "MoveUp") {	
-		SpinnerAscend(self);	
-	}	
-	else if (timerName == "MoveDown") {	
-		SpinnerDescend(self);
-	}	
-	else if (timerName == "Unlock") {	
+	if (timerName == "Unlock") {	
 		SpawnLegs(self);
 		self->SetNetworkVar(u"bIsInUse", false);
 		self->SetVar(u"bActive", true);		

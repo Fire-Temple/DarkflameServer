@@ -11,6 +11,7 @@
 #include "BuffComponent.h"
 #include "BaseCombatAIComponent.h"
 #include "PlayerManager.h"
+#include "MovingPlatformComponent.h"
 
 
 
@@ -155,7 +156,8 @@ void FtWavesManager::HandleSpinner(Entity* self, std::string spinner, std::strin
 	
     auto ProcessSpinnerUp = [](const std::vector<Entity*>& spinnerGroup) {
         for (auto* spinner : spinnerGroup) {
-            GameMessages::SendPlatformResync(spinner, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+			auto* movingPlatformComponent = spinner->GetComponent<MovingPlatformComponent>();
+			movingPlatformComponent->GotoWaypoint(1);
             RenderComponent::PlayAnimation(spinner, u"up");
             GameMessages::SendPlayNDAudioEmitter(spinner, spinner->GetSystemAddress(), "{7f770ade-b84c-46ad-b3ae-bdbace5985d4}");
             GameMessages::SendPlayFXEffect(spinner->GetObjectID(), 10102, u"create", "create");
@@ -163,7 +165,8 @@ void FtWavesManager::HandleSpinner(Entity* self, std::string spinner, std::strin
     };
     auto ProcessSpinnerDown = [](const std::vector<Entity*>& spinnerGroup) {
         for (auto* spinner : spinnerGroup) {
-            GameMessages::SendPlatformResync(spinner, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1, 1, eMovementPlatformState::Moving);
+			auto* movingPlatformComponent = spinner->GetComponent<MovingPlatformComponent>();
+			movingPlatformComponent->GotoWaypoint(0);
             RenderComponent::PlayAnimation(spinner, u"down");
             GameMessages::SendPlayNDAudioEmitter(spinner, spinner->GetSystemAddress(), "{97b60c03-51f2-45b6-80cc-ccbbef0d94cf}");
 
@@ -225,9 +228,10 @@ void FtWavesManager::HandleSpinner(Entity* self, std::string spinner, std::strin
 			BonezaiSpinnerUp = 0;			
             ProcessSpinnerDown(BonezaiSpinner);
         } else if (spinner == "gold") {
-//			Path is flipped handle manually			
+//			Move gold spinner down
 			for (auto* spinner : GoldSpinner) {
-				GameMessages::SendPlatformResync(spinner, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+				auto* movingPlatformComponent = spinner->GetComponent<MovingPlatformComponent>();
+				movingPlatformComponent->GotoWaypoint(0);
 				RenderComponent::PlayAnimation(spinner, u"down");
 				GameMessages::SendPlayNDAudioEmitter(spinner, spinner->GetSystemAddress(), "{97b60c03-51f2-45b6-80cc-ccbbef0d94cf}");
 			}		

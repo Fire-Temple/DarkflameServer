@@ -7,9 +7,8 @@
 
 
 void FtFlameJetServer::OnStartup(Entity* self) {
-	GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{49db2221-b4c7-414d-886e-6640e092f3b4}");
 	self->SetNetworkVar<bool>(u"FlameOn", true);
-	SpawnLegs(self);	
+	self->SetVar<uint8_t>(u"flameProgress", 0);
 }
 
 void FtFlameJetServer::OnCollisionPhantom(Entity* self, Entity* target) {
@@ -37,90 +36,17 @@ void FtFlameJetServer::OnCollisionPhantom(Entity* self, Entity* target) {
 	GameMessages::SendKnockback(target->GetObjectID(), self->GetObjectID(), self->GetObjectID(), 1000, dir);
 }
 
-void FtFlameJetServer::SpawnLegs(Entity* self) {
-	auto pos = self->GetPosition();
-	auto rot = self->GetRotation();
-	pos.y += self->GetVarAs<float>(u"vert_offset");
-
-	auto newRot = rot;
-	auto offset = self->GetVarAs<float>(u"hort_offset");
-
-	EntityInfo info{};
-	info.lot = 32000;
-	info.spawnerID = self->GetObjectID();
-	info.rot = newRot;
+void FtFlameJetServer::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1,
+	int32_t param2) {	
+	const auto blockingVolume = self->GetVar<std::u16string>(u"blockingVolume");
+	auto deactivatedName = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"name_deactivated_event"));
+	auto progress = self->GetVar<uint8_t>(u"flameProgress");
 	
-	auto legLocX = self->GetVar<float>(u"legLocX");
-	auto legLocY = self->GetVar<float>(u"legLocY");
-	auto legLocZ = self->GetVar<float>(u"legLocZ");
-	
-
-// if spinner up to down: pos.y = Spinner starting pos (aka Waypoint 1) - 0.2
-//if spinner down to up: pos.y = Spinner starting pos (aka Waypoint 1) - 0.1
-
-	const auto dir = QuatUtils::Right(rot);	
-	pos.x = legLocX;
-	pos.y = legLocY;
-	pos.z = legLocZ;
-	info.pos = pos;
-
-	info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
-
-	auto* entity = Game::entityManager->CreateEntity(info);
-
-	Game::entityManager->ConstructEntity(entity);
-
-	OnChildLoaded(self, entity);
-}
-
-void FtFlameJetServer::OnChildLoaded(Entity* self, Entity* child) {
-	auto legTable = self->GetVar<std::vector<LWOOBJID>>(u"legTable");
-
-	legTable.push_back(child->GetObjectID());
-
-	self->SetVar(u"legTable", legTable);
-
-	const auto selfID = self->GetObjectID();
-
-	child->AddDieCallback([this, selfID, child]() {
-		auto* self = Game::entityManager->GetEntity(selfID);
-		auto* destroyableComponent = child->GetComponent<DestroyableComponent>();
-
-		if (destroyableComponent == nullptr || self == nullptr) {
-			return;
+	if (name == deactivatedName) {
+		self->SetVar<uint8_t>(u"flameProgress", progress + 1);
+		if (blockingVolume != u"FlameJetBlocker01" || progress >= 2) {
+			self->AddTimer("FlamesOff", 2);
 		}
-
-		NotifyDie(self, child, destroyableComponent->GetKiller());
-		});
-}
-
-void FtFlameJetServer::NotifyDie(Entity* self, Entity* other, Entity* killer) {
-	auto players = self->GetVar<std::vector<LWOOBJID>>(u"Players");
-
-	const auto& iter = std::find(players.begin(), players.end(), killer->GetObjectID());
-
-	if (iter == players.end()) {
-		players.push_back(killer->GetObjectID());
-	}
-
-	self->SetVar(u"Players", players);
-
-	OnChildRemoved(self, other);
-}
-
-void FtFlameJetServer::OnChildRemoved(Entity* self, Entity* child) {
-	auto legTable = self->GetVar<std::vector<LWOOBJID>>(u"legTable");
-
-	const auto& iter = std::find(legTable.begin(), legTable.end(), child->GetObjectID());
-
-	if (iter != legTable.end()) {
-		legTable.erase(iter);
-	}
-
-	self->SetVar(u"legTable", legTable);
-
-	if (legTable.empty()) {
-		self->AddTimer("FlamesOff", 2);	
 	}
 }
 
@@ -128,8 +54,7 @@ void FtFlameJetServer::OnTimerDone(Entity* self, std::string timerName) {
 	if (timerName == "FlamesOff") {	
 		self->SetNetworkVar<bool>(u"FlameOn", false);	
 		self->AddTimer("SmashSelf", 2);	
-	}
-	if (timerName == "SmashSelf") {	
+	} else if (timerName == "SmashSelf") {	
 		self->Smash(self->GetObjectID(), eKillType::SILENT);
 	}
 }

@@ -807,6 +807,7 @@ void Entity::Initialize() {
 		// if we have a moving platform path, then we need a moving platform component
 		if (path->pathType == PathType::MovingPlatform) {
 			AddComponent<MovingPlatformComponent>(-1, pathName);
+			
 		} else if (path->pathType == PathType::Movement) {
 			auto* const movementAIcomponent = GetComponent<MovementAIComponent>();
 			if (movementAIcomponent && combatAiID == 0) {
@@ -843,7 +844,7 @@ void Entity::Initialize() {
 	}
 
 	// Hacky way to trigger these when the object has had a chance to get constructed
-	AddCallbackTimer(0, [this]() {
+	AddCallbackTimer(0, [this, path]() {
 		this->GetScript()->OnStartup(this);
 		if (this->m_ParentEntity) {
 			GameMessages::ChildLoaded childLoaded;
@@ -851,7 +852,18 @@ void Entity::Initialize() {
 			childLoaded.templateID = this->GetLOT();
 			this->m_ParentEntity->OnChildLoaded(childLoaded);
 		}
-		});
+		
+		// Setup moving platforms after OnStartup had a chance to modify values
+		if (path && path->pathType == PathType::MovingPlatform) {
+			auto* movingPlatformComponent = GetComponent<MovingPlatformComponent>();
+			
+			// force a resync
+			// if (GetVar<bool>(u"platformStartAtEnd")) movingPlatformComponent->Resync();
+
+			// if we need to start pathing on load
+			if (!movingPlatformComponent->m_NoAutoStart) movingPlatformComponent->StartPathing();
+		}
+	});
 
 	if (!m_Character && Game::entityManager->GetGhostingEnabled()) {
 		// Don't ghost what is likely large scene elements
@@ -1798,17 +1810,38 @@ void Entity::AddTimer(const std::string& name, float time) {
 	m_PendingTimers.emplace_back(name, time);
 }
 
-void Entity::AddCallbackTimer(float time, const std::function<void()> callback) {
-	m_PendingCallbackTimers.emplace_back(time, callback);
+void Entity::AddCallbackTimer(float time, const std::function<void()> callback, uint32_t id) {
+	m_PendingCallbackTimers.emplace_back(time, callback, id);
 }
 
 bool Entity::HasTimer(const std::string& name) {
 	return std::find(m_Timers.begin(), m_Timers.end(), name) != m_Timers.end();
 }
 
-void Entity::CancelCallbackTimers() {
-	m_CallbackTimers.clear();
-	m_PendingCallbackTimers.clear();
+void Entity::CancelCallbackTimers(uint32_t id)
+{
+    if (id == 0)
+    {
+        // Cancel everything
+        m_CallbackTimers.clear();
+        m_PendingCallbackTimers.clear();
+        return;
+    }
+
+    // Lambda to remove timers with the specific ID
+    auto removeById = [id](std::vector<EntityCallbackTimer>& container)
+    {
+        container.erase(
+            std::remove_if(container.begin(), container.end(),
+                [id](const EntityCallbackTimer& timer)
+                {
+                    return timer.GetID() == id;
+                }),
+            container.end());
+    };
+
+    removeById(m_CallbackTimers);
+    removeById(m_PendingCallbackTimers);
 }
 
 void Entity::ScheduleKillAfterUpdate(Entity* murderer) {

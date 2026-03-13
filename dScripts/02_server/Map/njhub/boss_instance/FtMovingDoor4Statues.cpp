@@ -44,7 +44,8 @@ void FtMovingDoor4Statues::OnFireEventServerSide(Entity* self, Entity* sender, s
 	if (args == "BuildComplete") {
 		if (Progress == 3) {
 			//Move Plat
-			GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+			auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+			movingPlatformComponent->GotoWaypoint(1);
 
 //			Completion check for boss
 			const auto BossManager = Game::entityManager->GetEntitiesInGroup("BossManager");

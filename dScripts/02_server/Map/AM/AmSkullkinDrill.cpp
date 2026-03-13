@@ -20,18 +20,210 @@ void AmSkullkinDrill::OnStartup(Entity* self) {
 		return;
 	}
 
-	movingPlatformComponent->SetSerialized(true);
-
-	movingPlatformComponent->GotoWaypoint(0);
-
-	auto* standObj = GetStandObj(self);
-
-	if (standObj != nullptr) {
-		standObj->SetVar(u"bActive", true);
-	}
+	movingPlatformComponent->SetNoAutoStart(true);
 
 	self->SetProximityRadius(5, "spin_distance");
+
+	// tell the stand to knockback players
+	auto* standObj = GetStandObj(self);			
+	standObj->NotifyObject(self, "knockback");	
 }
+
+void AmSkullkinDrill::OnSkillEventFired(Entity* self, Entity* caster, const std::string& message) {
+	if (message != "NinjagoSpinEvent" || self->GetNetworkVar<bool>(u"bIsInUse")) {
+		return;
+	}
+
+	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
+	if (proximityMonitorComponent == nullptr || !proximityMonitorComponent->IsInProximity("spin_distance", caster->GetObjectID())) {
+		return;
+	}
+
+	self->SetVar(u"activaterID", caster->GetObjectID());
+
+	self->SetNetworkVar(u"bIsInUse", true);
+
+	TriggerDrill(self, caster);
+}
+
+void AmSkullkinDrill::OnUse(Entity* self, Entity* user) {
+	if (self->GetNetworkVar<bool>(u"bIsInUse")) {
+		return;
+	}
+	const auto userID = user->GetObjectID();
+	
+	// freeze the user
+	GameMessages::SendSetStunned(userID, eStateChangeType::PUSH, user->GetSystemAddress(), LWOOBJID_EMPTY,
+		true, true, true, true, true, true, true, true, true
+	);
+
+	self->SetNetworkVar(u"bIsInUse", true);
+
+	GameMessages::SendPlayFXEffect(user->GetObjectID(), 5499, u"on-anim", "tornado");
+	GameMessages::SendPlayFXEffect(user->GetObjectID(), 5502, u"on-anim", "staff");
+
+	self->SetVar(u"userID", userID);
+	self->SetVar(u"activaterID", userID);
+
+	RenderComponent::PlayAnimation(user, "spinjitzu-staff-windup");
+	self->AddTimer("windupDone", 1.0f);
+}
+
+void AmSkullkinDrill::TriggerDrill(Entity* self, Entity* caster) {
+	
+	const auto& cine = self->GetVar<std::u16string>(u"cinematic");
+	if (!cine.empty()) {
+		GameMessages::SendPlayCinematic(caster->GetObjectID(), cine, caster->GetSystemAddress());		
+	}
+	
+	RenderComponent::PlayAnimation(self, u"slowdown");
+
+	self->AddTimer("resetDrill", 20);
+
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	if (movingPlatformComponent != nullptr) {
+		movingPlatformComponent->GotoWaypoint(1);
+	}
+}
+
+void AmSkullkinDrill::OnWaypointReached(Entity* self, uint32_t waypointIndex) {
+	LOG_DEBUG("Skullkin Drill reached waypoint %u", waypointIndex);
+	
+	if (waypointIndex == 1) {
+		SpawnBit(self);
+
+		RenderComponent::PlayAnimation(self, u"no-spin");
+		GameMessages::SendStopFXEffect(self, true, "active");
+		GameMessages::SendPlayFXEffect(self->GetObjectID(), -1, u"indicator", "indicator");
+
+		self->SetVar(u"bActive", false);
+
+		const auto playerID = self->GetVar<LWOOBJID>(u"userID");
+
+		auto* player = Game::entityManager->GetEntity(playerID);
+
+		if (player != nullptr) {
+			RenderComponent::PlayAnimation(player, "spinjitzu-staff-end");
+			self->AddTimer("animDone", 0.5f);		
+		}		
+	} else {
+		RenderComponent::PlayAnimation(self, u"idle");
+		GameMessages::SendPlayFXEffect(self->GetObjectID(), -1, u"spin", "active");
+		GameMessages::SendStopFXEffect(self, true, "indicator");	
+	}
+}
+
+void AmSkullkinDrill::SpawnBit(Entity* self) {
+	auto myPos = self->GetPosition();
+	auto myRot = self->GetRotation();
+
+	myPos.y -= 20.5f;
+
+	EntityInfo info = {};
+	info.lot = 12346;
+	info.pos = myPos;
+	info.rot = myRot;
+	info.scale = 3; // Needs the scale, otherwise attacks fail
+	info.spawnerID = self->GetObjectID();
+
+	auto* child = Game::entityManager->CreateEntity(info);
+
+	Game::entityManager->ConstructEntity(child);
+
+	self->SetVar(u"ChildSmash", child->GetObjectID());
+
+	child->AddDieCallback([this, self]() {
+		const auto& userID = self->GetVar<LWOOBJID>(u"activaterID");
+		auto* player = Game::entityManager->GetEntity(userID);
+		auto* standObj = GetStandObj(self);
+		
+		// tell the stand to knockback players
+		standObj->NotifyObject(self, "knockback");		
+		
+		if (self->GetVar<bool>(u"resetState")) return;
+		self->CancelAllTimers();
+		
+		if (player != nullptr) {
+			// Progress missions
+			auto* missionComponent = player->GetComponent<MissionComponent>();
+
+			if (missionComponent != nullptr) {
+				for (const auto missionID : m_MissionsToUpdate) {
+					missionComponent->ForceProgressValue(missionID, 1, self->GetLOT());
+				}
+			}
+			self->Smash(player->GetObjectID(), eKillType::SILENT);
+		} else {
+			self->Smash(self->GetObjectID(), eKillType::SILENT);
+		}
+
+		if (standObj != nullptr) {
+			GameMessages::SendPlayFXEffect(standObj->GetObjectID(), 4946, u"explode", "explode");
+		}
+	});	
+}
+
+void AmSkullkinDrill::OnHitOrHealResult(Entity* self, Entity* attacker, int32_t damage) {
+	
+	if (!attacker->IsPlayer() || self->GetVar<bool>(u"bActive")) return;
+	
+	const auto childID = self->GetVar<LWOOBJID>(u"ChildSmash");
+	auto* child = Game::entityManager->GetEntity(childID);
+	
+	// we can just smash the bit, let the die callback handle it
+	if (child != nullptr) {
+		child->Smash(self->GetObjectID(), eKillType::VIOLENT);
+	}	
+	
+}
+
+void AmSkullkinDrill::OnTimerDone(Entity* self, std::string timerName) {
+	if (timerName == "resetDrill") {
+		const auto childID = self->GetVar<LWOOBJID>(u"ChildSmash");
+		auto* child = Game::entityManager->GetEntity(childID);
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	
+		self->SetVar<bool>(u"resetState", true);
+
+		if (child != nullptr) {
+			child->Smash(self->GetObjectID(), eKillType::SILENT);
+		}
+
+		self->SetNetworkVar(u"bIsInUse", false);
+		self->SetVar(u"bActive", true);
+		self->SetVar(u"userID", LWOOBJID_EMPTY);
+		self->SetVar(u"activaterID", LWOOBJID_EMPTY);
+
+		if (movingPlatformComponent != nullptr) {
+			movingPlatformComponent->GotoWaypoint(0);
+		}
+		
+		self->SetVar<bool>(u"resetState", false);
+	
+	} else if (timerName == "windupDone") {
+		auto playerID = self->GetVar<LWOOBJID>(u"userID");
+		auto* player = Game::entityManager->GetEntity(playerID);
+
+		TriggerDrill(self, player);
+		
+		RenderComponent::PlayAnimation(player, u"spinjitzu-staff-loop");
+		
+	} else if (timerName == "animDone") {
+		auto playerID = self->GetVar<LWOOBJID>(u"userID");
+		auto* player = Game::entityManager->GetEntity(playerID);	
+		
+		GameMessages::SendStopFXEffect(player, true, "tornado");
+		GameMessages::SendStopFXEffect(player, true, "staff");
+	
+		// unfreeze the user
+		GameMessages::SendSetStunned(playerID, eStateChangeType::POP, player->GetSystemAddress(), LWOOBJID_EMPTY,
+			true, true, true, true, true, true, true, true, true
+		);
+
+		self->SetVar(u"userID", LWOOBJID_EMPTY);		
+	}
+}
+
 
 Entity* AmSkullkinDrill::GetStandObj(Entity* self) {
 	const auto& myGroup = self->GetGroups();
@@ -48,279 +240,7 @@ Entity* AmSkullkinDrill::GetStandObj(Entity* self) {
 
 	if (standObjs.empty()) {
 		return nullptr;
-	}
-
-	return standObjs[0];
-}
-
-void AmSkullkinDrill::OnSkillEventFired(Entity* self, Entity* caster, const std::string& message) {
-	if (message != "NinjagoSpinEvent" || self->GetNetworkVar<bool>(u"bIsInUse")) {
-		return;
-	}
-
-	auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
-
-	if (proximityMonitorComponent == nullptr || !proximityMonitorComponent->IsInProximity("spin_distance", caster->GetObjectID())) {
-		return;
-	}
-
-	self->SetVar(u"activaterID", caster->GetObjectID());
-
-	self->SetNetworkVar(u"bIsInUse", true);
-
-	TriggerDrill(self);
-}
-
-void AmSkullkinDrill::TriggerDrill(Entity* self) {
-	RenderComponent::PlayAnimation(self, u"slowdown");
-
-	self->AddTimer("killDrill", 10.0f);
-
-	auto* standObj = GetStandObj(self);
-
-	if (standObj != nullptr) {
-		standObj->SetVar(u"bActive", false);
-	}
-
-	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
-
-	if (movingPlatformComponent == nullptr) {
-		return;
-	}
-
-	movingPlatformComponent->GotoWaypoint(1);
-}
-
-void AmSkullkinDrill::OnWaypointReached(Entity* self, uint32_t waypointIndex) {
-	if (waypointIndex == 1) {
-		auto myPos = self->GetPosition();
-		auto myRot = self->GetRotation();
-
-		myPos.y -= 21;
-
-		EntityInfo info = {};
-		info.lot = 12346;
-		info.pos = myPos;
-		info.rot = myRot;
-		info.scale = 3; // Needs the scale, otherwise attacks fail
-		info.spawnerID = self->GetObjectID();
-
-		auto* child = Game::entityManager->CreateEntity(info);
-
-		Game::entityManager->ConstructEntity(child);
-
-		self->SetVar(u"ChildSmash", child->GetObjectID());
-
-		child->AddDieCallback([this, self]() {
-			const auto& userID = self->GetVar<LWOOBJID>(u"activaterID");
-
-			auto* player = Game::entityManager->GetEntity(userID);
-
-			if (player == nullptr) {
-				return;
-			}
-
-			OnHitOrHealResult(self, player, 1);
-			});
-	}
-
-	OnArrived(self, waypointIndex);
-}
-
-void AmSkullkinDrill::OnUse(Entity* self, Entity* user) {
-	if (self->GetNetworkVar<bool>(u"bIsInUse")) {
-		return;
-	}
-
-	self->SetNetworkVar(u"bIsInUse", true);
-
-	GameMessages::SendPlayFXEffect(user->GetObjectID(), 5499, u"on-anim", "tornado");
-	GameMessages::SendPlayFXEffect(user->GetObjectID(), 5502, u"on-anim", "staff");
-
-	const auto userID = user->GetObjectID();
-
-	self->SetVar(u"userID", userID);
-	self->SetVar(u"activaterID", userID);
-
-	PlayAnim(self, user, "spinjitzu-staff-windup");
-	PlayCinematic(self);
-
-	FreezePlayer(self, user, true);
-}
-
-void AmSkullkinDrill::FreezePlayer(Entity* self, Entity* player, bool bFreeze) {
-	auto StateChangeType = eStateChangeType::POP;
-
-	if (bFreeze) {
-		if (player->GetIsDead()) {
-			return;
-		}
-
-		StateChangeType = eStateChangeType::PUSH;
-	} else {
-		if (player->GetIsDead()) {
-			//
-		}
-	}
-
-	GameMessages::SendSetStunned(player->GetObjectID(), StateChangeType, player->GetSystemAddress(), self->GetObjectID(),
-		true, false, true, false, true, false, true
-	);
-}
-
-void AmSkullkinDrill::OnArrived(Entity* self, uint32_t waypointIndex) {
-	auto* standObj = GetStandObj(self);
-
-	if (waypointIndex == 1) {
-		RenderComponent::PlayAnimation(self, u"no-spin");
-		GameMessages::SendStopFXEffect(self, true, "active");
-		GameMessages::SendPlayFXEffect(self->GetObjectID(), -1, u"indicator", "indicator");
-
-		self->SetVar(u"bActive", false);
-
-		const auto playerID = self->GetVar<LWOOBJID>(u"userID");
-
-		auto* player = Game::entityManager->GetEntity(playerID);
-
-		if (player != nullptr) {
-			PlayAnim(self, player, "spinjitzu-staff-end");
-		}
-
-		if (standObj != nullptr) {
-			standObj->SetVar(u"bActive", false);
-		}
-
-		return;
-	} else {
-		RenderComponent::PlayAnimation(self, u"idle");
-		GameMessages::SendPlayFXEffect(self->GetObjectID(), -1, u"spin", "active");
-		GameMessages::SendStopFXEffect(self, true, "indicator");
-	}
-}
-
-void AmSkullkinDrill::PlayCinematic(Entity* self) {
-	auto* player = Game::entityManager->GetEntity(self->GetVar<LWOOBJID>(u"userID"));
-
-	if (player == nullptr) {
-		return;
-	}
-
-	const auto& cine = self->GetVar<std::u16string>(u"cinematic");
-
-	if (cine.empty()) {
-		return;
-	}
-
-	GameMessages::SendPlayCinematic(player->GetObjectID(), cine, player->GetSystemAddress());
-}
-
-void AmSkullkinDrill::PlayAnim(Entity* self, Entity* player, const std::string& animName) {
-	const auto animTime = animName == "spinjitzu-staff-end" ? 0.5f : 1.0f;
-
-	RenderComponent::PlayAnimation(player, animName);
-
-	self->AddTimer("AnimDone_" + animName, animTime);
-}
-
-void AmSkullkinDrill::OnHitOrHealResult(Entity* self, Entity* attacker, int32_t damage) {
-	auto* destroyableComponent = self->GetComponent<DestroyableComponent>();
-
-	if (destroyableComponent == nullptr || !attacker->IsPlayer()) {
-		return;
-	}
-
-	if (self->GetVar<bool>(u"bActive")) {
-		return;
-	}
-
-	const auto activaterID = self->GetVar<LWOOBJID>(u"activaterID");
-
-	auto* activator = Game::entityManager->GetEntity(activaterID);
-
-	// TODO: Missions
-	if (activator != nullptr) {
-		auto* missionComponent = activator->GetComponent<MissionComponent>();
-
-		if (missionComponent != nullptr) {
-			for (const auto missionID : m_MissionsToUpdate) {
-				missionComponent->ForceProgressValue(missionID, 1, self->GetLOT());
-			}
-		}
-	}
-
-	self->Smash(attacker->GetObjectID(), eKillType::SILENT);
-
-	self->CancelAllTimers();
-
-	auto* standObj = GetStandObj(self);
-
-	if (standObj != nullptr) {
-		GameMessages::SendPlayFXEffect(standObj->GetObjectID(), 4946, u"explode", "explode");
-	}
-}
-
-void AmSkullkinDrill::OnTimerDone(Entity* self, std::string timerName) {
-	if (timerName == "killDrill") {
-		const auto childID = self->GetVar<LWOOBJID>(u"ChildSmash");
-
-		auto* child = Game::entityManager->GetEntity(childID);
-
-		if (child != nullptr) {
-			child->Smash(self->GetObjectID(), eKillType::SILENT);
-		}
-
-		self->SetNetworkVar(u"bIsInUse", false);
-		self->SetVar(u"bActive", true);
-		self->SetVar(u"activaterID", LWOOBJID_EMPTY);
-
-		auto* standObj = GetStandObj(self);
-
-		if (standObj != nullptr) {
-			standObj->SetVar(u"bActive", true);
-		}
-
-		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
-
-		if (movingPlatformComponent == nullptr) {
-			return;
-		}
-
-		movingPlatformComponent->GotoWaypoint(0);
-
-		return;
-	}
-
-	const auto& data = GeneralUtils::SplitString(timerName, '_');
-
-	if (data.empty()) {
-		return;
-	}
-
-	if (data[0] == "AnimDone") {
-		const auto& animName = data[1];
-
-		const auto playerID = self->GetVar<LWOOBJID>(u"userID");
-
-		auto* player = Game::entityManager->GetEntity(playerID);
-
-		if (player == nullptr) {
-			return;
-		}
-
-		if (animName == "spinjitzu-staff-windup") {
-			TriggerDrill(self);
-
-			RenderComponent::PlayAnimation(player, u"spinjitzu-staff-loop");
-		} else if (animName == "spinjitzu-staff-end") {
-			FreezePlayer(self, player, false);
-
-			self->SetVar(u"userID", LWOOBJID_EMPTY);
-
-			GameMessages::SendStopFXEffect(player, true, "tornado");
-			GameMessages::SendStopFXEffect(player, true, "staff");
-		}
-
-	} else if (data[0] == "TryUnFreezeAgain") {
-
+	} else {	
+		return standObjs[0];
 	}
 }

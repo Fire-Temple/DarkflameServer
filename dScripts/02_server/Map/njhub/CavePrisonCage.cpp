@@ -76,20 +76,8 @@ void CavePrisonCage::SpawnCounterweight(Entity* self, Spawner* spawner) {
 			});
 
 		quickBuildComponent->AddQuickBuildCompleteCallback([this, self](Entity* user) {
-			// The counterweight is a simple mover, which is not implemented, so we'll just set it's position
-			auto* counterweight = Game::entityManager->GetEntity(self->GetVar<LWOOBJID>(u"Counterweight"));
 
-			if (counterweight == nullptr) {
-				return;
-			}
-
-			// Move the counterweight down 2 units
-			counterweight->SetPosition(counterweight->GetPosition() + NiPoint3(0, -2, 0));
-
-			// Serialize the counterweight
-			Game::entityManager->SerializeEntity(counterweight);
-
-			// notifyPlatformAtLastWaypoint
+			// The counterweight has startPathingOnLoad, so we don't need to do anything
 
 			// Save the userID as Builder
 			self->SetVar<LWOOBJID>(u"Builder", user->GetObjectID());

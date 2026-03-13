@@ -15,7 +15,7 @@ void AmSkullkinTower::OnStartup(Entity* self) {
 	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 
 	if (movingPlatformComponent != nullptr) {
-		movingPlatformComponent->StopPathing();
+		movingPlatformComponent->SetNoAutoStart(true);
 	}
 
 	SpawnLegs(self, "Left");

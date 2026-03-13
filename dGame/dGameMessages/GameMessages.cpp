@@ -387,29 +387,16 @@ void GameMessages::SendResetMissions(Entity* entity, const SystemAddress& sysAdd
 
 void GameMessages::SendPlatformResync(Entity* entity, const SystemAddress& sysAddr, bool bStopAtDesiredWaypoint,
 	int iIndex, int iDesiredWaypointIndex, int nextIndex,
-	eMovementPlatformState movementState) {
+	eMovementPlatformState movementState, float fPercentBetweenPoints, 
+	float fIdleTimeElapsed, float fMoveTimeElapsed, bool bReverse) {
 	CBITSTREAM;
 	CMSGHEADER;
-
-	const auto lot = entity->GetLOT();
-
-	if (lot == 12341 || lot == 5027 || lot == 5028 || lot == 14335 || lot == 14447 || lot == 14449 || lot == 11306 || lot == 11308) {
-		iDesiredWaypointIndex = (lot == 11306 || lot == 11308) ? 1 : 0;
-		iIndex = 0;
-		nextIndex = 0;
-		bStopAtDesiredWaypoint = true;
-		movementState = eMovementPlatformState::Stationary;
-	}
 
 	bitStream.Write(entity->GetObjectID());
 	bitStream.Write(MessageType::Game::PLATFORM_RESYNC);
 
-	bool bReverse = false;
 	int eCommand = 0;
 	int eUnexpectedCommand = 0;
-	float fIdleTimeElapsed = 0.0f;
-	float fMoveTimeElapsed = 0.0f;
-	float fPercentBetweenPoints = 0.0f;
 	NiPoint3 ptUnexpectedLocation = NiPoint3Constant::ZERO;
 	NiQuaternion qUnexpectedRotation = QuatUtils::IDENTITY;
 
@@ -4890,8 +4877,24 @@ void GameMessages::HandleFireEventServerSide(RakNet::BitStream& inStream, Entity
 }
 
 void GameMessages::HandleRequestPlatformResync(RakNet::BitStream& inStream, Entity* entity, const SystemAddress& sysAddr) {
-	if (entity->GetLOT() == 6267 || entity->GetLOT() == 16141) return;
-	GameMessages::SendPlatformResync(entity, sysAddr);
+	auto* movingPlatformComponent = entity->GetComponent<MovingPlatformComponent>();	
+	auto* subComponent = movingPlatformComponent->GetMoverSubComponent();
+	const auto lot = entity->GetLOT();
+	
+	if (lot == 6267) {
+		return;
+	
+	// do we have a simple mover?
+	} else if (entity->GetVar<bool>(u"platformIsSimpleMover")) {
+		LOG_DEBUG("Requested resync for a simple mover, what should we do?");
+
+	} else if (subComponent->mLastWaypointIndex == 1 && subComponent->mCurrentWaypointIndex == 1 && entity->GetVar<bool>(u"platformStartAtEnd")) {	
+		// send	a smooth transition for these		
+		GameMessages::SendPlatformResync(entity, sysAddr);		
+	} else {
+		// send server values
+		movingPlatformComponent->Resync(sysAddr);
+	}
 }
 
 void GameMessages::HandleQuickBuildCancel(RakNet::BitStream& inStream, Entity* entity) {

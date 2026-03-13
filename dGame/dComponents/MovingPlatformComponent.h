@@ -1,8 +1,3 @@
-/*
- * Darkflame Universe
- * Copyright 2019
- */
-
 #ifndef MOVINGPLATFORMCOMPONENT_H
 #define MOVINGPLATFORMCOMPONENT_H
 
@@ -15,6 +10,8 @@
 #include "Component.h"
 #include "eMovementPlatformState.h"
 #include "eReplicaComponentType.h"
+
+#include <chrono>
 
 class Path;
 
@@ -38,7 +35,8 @@ public:
 	MoverSubComponent(const NiPoint3& startPos);
 	~MoverSubComponent();
 
-	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate);
+	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate, bool simpleMover = false, 
+	NiPoint3 simpleMoverPos = {}, NiQuaternion simpleMoverRot = {});
 
 	/**
 	 * The state the platform is currently in
@@ -48,7 +46,12 @@ public:
 	/**
 	 * The waypoint this platform currently wants to traverse to
 	 */
-	int32_t mDesiredWaypointIndex = 0;
+	uint32_t mDesiredWaypointIndex = -1;
+	
+	/**
+	 * The scheduled waypoint this platform currently wants to traverse to
+	 */
+	int32_t mScheduledWaypoint = 0;	
 
 	/**
 	 * Whether the platform is currently reversing away from the desired waypoint
@@ -66,10 +69,35 @@ public:
 	float mPercentBetweenPoints = 0;
 
 	/**
-	 * The current position of the platofrm
+	 * The current position of the platform based off current waypoint
 	 */
 	NiPoint3 mPosition{};
+	
+	/**
+	 * The current rotation of the platform based off current waypoint
+	 */
+	NiQuaternion mRotation{};	
+	
+	/**
+	 * Timestamp of when the platform began moving
+	 */	
+	std::chrono::steady_clock::time_point mLegStartTime{};
 
+	/**
+	 * The total travel distance for the platform
+	 */
+	float mLegTotalDistance;
+	
+	/**
+	 * Estimated distance traveled for the platform; always forward facing
+	 */	
+	float mLegDistanceProgress;
+		
+	/**
+	 * Finish the current leg before stopping
+	 */
+	bool mFinishLeg;
+	
 	/**
 	 * The waypoint the platform is (was) at
 	 */
@@ -79,6 +107,11 @@ public:
 	 * The waypoint the platform is attempting to go to
 	 */
 	uint32_t mNextWaypointIndex;
+	
+	/**
+	 * The last waypoint in the path
+	 */
+	uint32_t mLastWaypointIndex;	
 
 	/**
 	 * The timer that handles the time before stopping idling and continue platform movement
@@ -94,6 +127,21 @@ public:
 	 * The time to wait before continuing movement
 	 */
 	float mWaitTime = 0;
+	
+	/**
+	 * Play once the platform starts
+	 */
+	std::string mStartGUID;
+	
+	/**
+	 * Play once the platform stops
+	 */
+	std::string mStopGUID;	
+	
+	/**
+	 * Play during platform pathing
+	 */
+	std::string mTravelGUID;
 };
 
 
@@ -124,32 +172,47 @@ public:
 	void OnCompleteQuickBuild();
 
 	/**
-	 * Updates the movement state for the moving platform
-	 * @param value the movement state to set
-	 */
-	void SetMovementState(eMovementPlatformState value);
-
-	/**
 	 * Instructs the moving platform to go to some waypoint
 	 * @param index the index of the waypoint
 	 * @param stopAtWaypoint determines if the platform should stop at the waypoint
 	 */
-	void GotoWaypoint(uint32_t index, bool stopAtWaypoint = true);
+	void GotoWaypoint(uint32_t index, bool stopAtWaypoint = true, bool immediate = true);
+	
+	/**
+	 * Instructs the moving platform to go to the next waypoint
+	 * @param stopAtWaypoint determines if the platform should stop at the waypoint
+	 */
+	void GotoNextWaypoint(bool stopAtWaypoint = true, bool immediate = true);	
 
 	/**
 	 * Starts the pathing of this platform, setting appropriate waypoints and speeds
 	 */
-	void StartPathing();
-
-	/**
-	 * Continues the path of the platform, after it's been stopped
-	 */
-	void ContinuePathing();
+	void StartPathing(bool forceMove = false, bool flip = false);
 
 	/**
 	 * Stops the platform from moving, waiting for it to be activated again.
 	 */
-	void StopPathing();
+	void StopPathing(bool immediate = true);
+
+	/**
+	 * Starts pathing for simple movers (NJ)
+	 */
+	void SimpleMove();
+
+	/**
+	 * Turn time traveled into distance; always forward facing
+	 */
+	float CalculateDistance();
+
+	/**
+	 * Turn progress times into percent for precise pathing
+	 */
+	float CalculatePercent();
+	
+	/**
+	 * Send resync with server values
+	 */	
+	void Resync(const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
 
 	/**
 	 * Determines if the entity should be serialized on the next update
@@ -157,6 +220,11 @@ public:
 	 */
 	void SetSerialized(bool value);
 
+	/**
+	 * Sets appropriate sounds for the platform
+	 */
+	void StartSounds(bool starting);
+	
 	/**
 	 * Returns if this platform will start automatically after spawn
 	 * @return if this platform will start automatically after spawn
@@ -186,6 +254,11 @@ public:
 	 * @return the sub component that actually defines how the platform moves around
 	 */
 	MoverSubComponent* GetMoverSubComponent() const;
+	
+	/**
+	 * Whether the platform shouldn't auto start
+	 */
+	bool m_NoAutoStart;	
 
 private:
 
@@ -202,7 +275,17 @@ private:
 	/**
 	 * Whether the platform has stopped pathing
 	 */
-	bool m_PathingStopped = false;
+	bool m_PathingStopped = true;
+	
+	/**
+	 * Is the platform direclty pathing from GotoWaypoint
+	 */
+	bool m_IsDirectPathing = false;	
+	
+	/**
+	 * Whether the platform has a path
+	 */
+	bool m_HasPath = true;	
 
 	/**
 	 * The type of the subcomponent
@@ -215,14 +298,20 @@ private:
 	void* m_MoverSubComponent;
 
 	/**
-	 * Whether the platform shouldn't auto start
+	 * If speed is actually time in seconds
 	 */
-	bool m_NoAutoStart;
-
+	bool m_TimeBased;	
+	
 	/**
 	 * Whether to serialize the entity on the next update
 	 */
-	bool m_Serialize = false;
+	bool m_Serialize = true;
+	
+	/**
+	 * hardcoded CallbackTimer ids, component id + incremental per function or whatever we need
+	 */
+	uint32_t startPathing_callbackId = 2501;	
+	uint32_t simpleMove_callbackId = 2502;
 };
 
 #endif // MOVINGPLATFORMCOMPONENT_H

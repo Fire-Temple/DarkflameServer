@@ -5,26 +5,9 @@ class SpawnerSpinner71 : public CppScripts::Script
 {
 public:
 	void OnStartup(Entity* self) override;
-
-	void OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) override;
-
-	void SpawnLegs(Entity* self, const std::string& loc);
-
-	void OnChildLoaded(Entity* self, Entity* child);
-
-	void NotifyDie(Entity* self, Entity* other, Entity* killer);
-
-	void OnChildRemoved(Entity* self, Entity* child);
+	
+	void OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1, int32_t param2) override;
 
 	void OnTimerDone(Entity* self, std::string timerName) override;
-
-private:
-
-	int IsActivated;
-
-    	static Entity* player1;
-    	static Entity* player2;
-    	static Entity* player3;
-    	static Entity* player4;
 
 };

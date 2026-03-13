@@ -20,44 +20,32 @@ void SpinnerHighBladeGen::OnStartup(Entity* self) {
 		self->SetVar<int>(u"ToggleSpinner", 1);	
 	} 		
 	
+//	Is the platform starting up?
 	if (self->GetVar<bool>(u"platformStartAtEnd")) {
-//		Immediate visuals for entrance spinners		
 		const auto groupID = self->GetVar<std::u16string>(u"groupID");
 		const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 		
-		self->SetVar<bool>(u"SpinnerIsUp", false);	
+		self->SetVar<bool>(u"SpinnerIsUp", true);
+
+		self->SetProximityRadius(5.9, "damage_distance");
 		
-		if (self->GetVar<std::u16string>(u"groupID") == u"room_1_blades;") {	
+		self->AddTimer("BladeGUID", 14);	
 		
-			self->SetVar<bool>(u"SpinnerIsUp", true);	
-			self->SetProximityRadius(5.9, "damage_distance");
-			self->AddTimer("EntranceAnimLoop", 3);	
-			
-			if (AttachedPath == u"ZSpinner03") {
-				self->AddTimer("BladeGUID", 11);	
-			} 		
-			return;
-		} else {
-			self->SetVar<bool>(u"SpinnerIsUp", false);				
-		}	
 	} else {
-		self->SetVar<bool>(u"SpinnerIsUp", true);				
-	}
-	self->AddTimer("Return", 26);		
+		self->SetVar<bool>(u"SpinnerIsUp", false);
+	}	
 }
 
 void SpinnerHighBladeGen::SpinnerAscend(Entity* self) {	
-	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();	
+	movingPlatformComponent->GotoWaypoint(1);
+
 	RenderComponent::PlayAnimation(self, u"up");
 	
-//	Fake skill pulse to avoid instant user damage
-	self->AddTimer("SkillPulse", 1.6f);
-	self->AddTimer("SkillPulse", 2.6f);
-	self->AddTimer("SkillPulse", 3.6f);	
-	
 	self->AddTimer("IdleAnim", 1);	
-	self->AddTimer("BladeRadius", 3.5f);
+	self->AddTimer("BladeRadius", 1.5f);
+	self->AddTimer("SkillPulse", 1.6f);	
 	
 //	Ascend sfx
 	GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{7f770ade-b84c-46ad-b3ae-bdbace5985d4}");	
@@ -67,7 +55,10 @@ void SpinnerHighBladeGen::SpinnerAscend(Entity* self) {
 void SpinnerHighBladeGen::SpinnerDescend(Entity* self) {	
 
 	self->SetVar<bool>(u"SpinnerIsUp", false);
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);		
+	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(0);
+	
 	RenderComponent::PlayAnimation(self, u"down");
 
 
@@ -76,6 +67,7 @@ void SpinnerHighBladeGen::SpinnerDescend(Entity* self) {
 	
 //	Descend sfx
 	const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
+// 	Axe spinner?
 	if (AttachedPath == u"ZSpinner53") {
 		GameMessages::SendStopNDAudioEmitter(self, self->GetSystemAddress(), "{43d11dc0-a096-4595-8fbe-f95a4a0d951e}");	
 	} else {
@@ -116,12 +108,11 @@ void SpinnerHighBladeGen::OnNotifyObject(Entity* self, Entity* sender, const std
 //		Check if timed
 		auto ResetTime = sender->GetVar<int32_t>(u"reset_time");
 		if (ResetTime >= 1 && self->GetVar<int>(u"ToggleSpinner") != 1) {	
-			self->AddTimer("Return", ResetTime + 2.5);	
-//			2.5 = rough estimate of movetime for platforms		
+			self->AddTimer("Return", ResetTime + 2);	
+//			give a little extra time	
 		}
 		if (self->GetVar<bool>(u"SpinnerIsUp")) {				
-			SpinnerDescend(self);			
-			self->CancelTimer("EntranceAnimLoop");				
+			SpinnerDescend(self);	
 		} else {
 			SpinnerAscend(self);	
 		}	
@@ -144,9 +135,10 @@ void SpinnerHighBladeGen::OnTimerDone(Entity* self, std::string timerName) {
 			self->AddTimer("SkillPulse", 1);
 		}		
 	}
-	else if (timerName == "BladeRadius") {		
-		self->SetVar<bool>(u"SpinnerIsUp", true);
-//		^^ If ProxRadius activated, should be true anyways		
+	else if (timerName == "BladeRadius") {
+//		If ProxRadius activated, should be true anyways	
+		self->SetVar<bool>(u"SpinnerIsUp", true);	
+		
 		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
 		self->SetProximityRadius(5.9, "damage_distance");			
 	}			
@@ -160,15 +152,11 @@ void SpinnerHighBladeGen::OnTimerDone(Entity* self, std::string timerName) {
 			SpinnerAscend(self);
 		}	
 	}
-	else if (timerName == "EntranceAnimLoop") {			
-		RenderComponent::PlayAnimation(self, u"idle-up");	
-		if (self->GetVar<bool>(u"SpinnerIsUp")) {
-			self->AddTimer("EntranceAnimLoop", 1);
-		}	
-	}
+
 //	Handle blades GUID
 	else if (timerName == "BladeGUID") {
 		const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
+		// Axe spinner?
 		if (AttachedPath == u"ZSpinner53") {
 			GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{43d11dc0-a096-4595-8fbe-f95a4a0d951e}");	
 		} else {

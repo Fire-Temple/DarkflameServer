@@ -372,7 +372,6 @@
 #include "MillstoneEvent.h"
 #include "Button70.h"
 #include "SpawnerSpinner71.h"
-#include "FtMillstoneCinematic.h"
 #include "FtLowBlades.h"
 #include "SpinnerWaves.h"
 
@@ -385,6 +384,8 @@
 #include "OnyxShardPack.h"
 
 //Njhub misc
+#include "NjEarthPillars.h"
+#include "NjLightningOrb.h"
 #include "NjFireRocks.h"
 #include "NjFireRocksManager.h"
 #include "SimpleMoverSwitch.h"
@@ -685,6 +686,8 @@ namespace {
 		{"scripts\\02_server\\Map\\njhub\\L_EARTH_PET_SERVER.lua", []() {return new NjEarthPetServer();}},
 		{"scripts\\02_server\\Map\\njhub\\L_DRAGON_EMBLEM_CHEST_SERVER.lua", []() {return new NjDragonEmblemChestServer();}},
 		{"scripts\\02_server\\Map\\njhub\\L_NYA_MISSION_ITEMS.lua", []() {return new NjNyaMissionitems();}},
+		{"scripts\\02_server\\Map\\njhub\\L_EARTH_TRANS_PILLARS.lua", []() {return new NjEarthPillars();}},
+		{"scripts\\02_server\\Map\\njhub\\L_LIGHTNING_ORB_SERVER.lua", []() {return new NjLightningOrb();}},		
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS.lua", []() {return new NjFireRocks();}},
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS_MANAGER.lua", []() {return new NjFireRocksManager();}},		
 		{"scripts\\02_server\\Map\\General\\L_SIMPLE_MOVER_SWITCH.lua", []() {return new SimpleMoverSwitch();}},	
@@ -798,7 +801,6 @@ namespace {
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_MILLSTONE_EVENT.lua", []() { return new MillstoneEvent(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BUTTON70.lua", []() { return new Button70(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_SPAWNER_SPINNER71.lua", []() { return new SpawnerSpinner71(); } },
-		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_MILLSTONE_CINEMATIC.lua", []() { return new FtMillstoneCinematic(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_LOWBLADES.lua", []() { return new FtLowBlades(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_ELEVATORSPINNER_WAVES.lua", []() { return new SpinnerWaves(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_GARMADON_TORNADO.lua", []() { return new FtGarmadonTornado(); } },		

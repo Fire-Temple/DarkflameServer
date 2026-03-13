@@ -50,7 +50,8 @@ void SpinnerLowBlade::OnSkillEventFired(Entity* self, Entity* caster, const std:
 void SpinnerLowBlade::TriggerDrill(Entity* self) {
 	
 //	Move spinners	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(1);
 	
 	auto SpinnerEntities = Game::entityManager->GetEntitiesInGroup("ShootSpinner2");	
 	for (auto* spinner : SpinnerEntities) {		
@@ -73,8 +74,8 @@ void SpinnerLowBlade::TriggerDrill(Entity* self) {
 	auto ResetTime = self->GetVar<int32_t>(u"reset_time");
 	
 	if (ResetTime >= 1) {	
-		self->AddTimer("Return", ResetTime + 2.5);	
-//		2.5 = rough estimate of movetime for the timed platforms using this script			
+		self->AddTimer("Return", ResetTime + 2);	
+//		give a little extra time	
 	}
 	
 //	Ascend sfx
@@ -108,11 +109,13 @@ void SpinnerLowBlade::SpawnLegs(Entity* self) {
 void SpinnerLowBlade::OnTimerDone(Entity* self, std::string timerName) {
 
 	if (timerName == "Return") {
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);		
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+		movingPlatformComponent->GotoWaypoint(0);
+		
 		RenderComponent::PlayAnimation(self, u"down");
 		self->AddTimer("Idle", 1.0f);
 
-		self->AddTimer("Unlock", 2.5f);
+		self->AddTimer("Unlock", 2);
 		
 //		Descend sfx
 		GameMessages::SendStopNDAudioEmitter(self, self->GetSystemAddress(), "{dcd06295-949b-4179-8b99-129116def406}");	

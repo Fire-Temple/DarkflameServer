@@ -11,22 +11,15 @@
 Entity* FtGarmadonTornado::randomPlayer = nullptr;
 
 void FtGarmadonTornado::OnStartup(Entity* self) {	
-
-	auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
-	if (movingPlatform == nullptr) {
-		return;
-	}	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	if (movingPlatformComponent == nullptr) return;	
 	
 	const auto BossManager = Game::entityManager->GetEntitiesInGroup("BossManager");	
 	for (auto* manager : BossManager) {	
 		randomNum = manager->GetVar<int>(u"randNum");	
-	}	
-		
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
-
+	}
 	
-	self->AddTimer("StartPathing", 25);				
-	self->AddTimer("FXLoop", 5);	
+	self->AddTimer("StartPathing", 25);
 }
 
 
@@ -56,54 +49,30 @@ int32_t param1, int32_t param2) {
 
 void FtGarmadonTornado::OnWaypointReached(Entity* self, uint32_t waypointIndex) {
 	auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
-	int nextWaypoint = waypointIndex + 1;
+	uint32_t nextWaypoint = waypointIndex + 1;
 
-
-
-}	
-
-	
-	
-//	I guess since moving platforms technically aren't moving, proximity doesn't move with moving plat
-
-//	Functions to use if fixed, use "TornadoProx" proximity (instead of a phantom physics object)
-// 	to avoid sending changes to clients
-	
-void FtGarmadonTornado::OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) {
-	if (name == "TornadoProx") {
-		if (entering->IsPlayer() && status == "ENTER") {
-//			OnHit skill for player			
-			auto* skillComponent = self->GetComponent<SkillComponent>();				
-			skillComponent->CastSkill(this->TornadoHitSkill, entering->GetObjectID());
-			
-//			Knockback for player			
-			auto dir = QuatUtils::Forward(entering->GetRotation());
-			dir.y = 18;
-			dir.x = -dir.x * 21;
-			dir.z = -dir.z * 21;
-			GameMessages::SendKnockback(entering->GetObjectID(), self->GetObjectID(), self->GetObjectID(), 1000, dir);
-		}
-	}
 }
+	
+//	TODO assign phantom physics to tornado for client
 
-void FtGarmadonTornado::OnCollisionPhantom(Entity* self, Entity* target) {	
-//	if (target->IsPlayer()) {
+void FtGarmadonTornado::OnFireEventServerSide(Entity* self, Entity* sender, std::string args, 
+	int32_t param1, int32_t param2, int32_t param3) {
+		
+	if (args == "PlayerInTornado") {		
+		LOG_DEBUG("A player entered the tornado");
+		
 //		OnHit skill for player			
-//		auto* skillComponent = self->GetComponent<SkillComponent>();				
-//		skillComponent->CastSkill(this->TornadoHitSkill, target->GetObjectID());
+		auto* skillComponent = self->GetComponent<SkillComponent>();				
+		skillComponent->CastSkill(this->TornadoHitSkill, sender->GetObjectID());
 			
 //		Knockback for player			
-//		auto dir = target->GetRotation().GetForwardVector();
-//		dir.y = 18;
-//		dir.x = -dir.x * 21;
-//		dir.z = -dir.z * 21;
-//		GameMessages::SendKnockback(target->GetObjectID(), self->GetObjectID(), self->GetObjectID(), 1000, dir);		
-		
-//	}	
-}	
-
-//	End of proximity/phantom functions
-
+		auto dir = QuatUtils::Forward(sender->GetRotation());
+		dir.y = 18;
+		dir.x = -dir.x * 21;
+		dir.z = -dir.z * 21;
+		GameMessages::SendKnockback(sender->GetObjectID(), self->GetObjectID(), self->GetObjectID(), 1000, dir);
+	}
+}
 
 
 void FtGarmadonTornado::OnTimerDone(Entity* self, std::string timerName) {
@@ -118,33 +87,22 @@ void FtGarmadonTornado::OnTimerDone(Entity* self, std::string timerName) {
 
 		self->AddTimer("BombPlayer", 28);		
 
-	}	
-	if (timerName == "FXLoop") {	
-//		GameMessages::SendPlayFXEffect(self->GetObjectID(), 32169, u"create", "garmadon_idle_mid");	
-//		GameMessages::SendPlayFXEffect(self->GetObjectID(), 32101, u"create", "garmadon_idle_base");
-		
-		
-//		Make sure tornado @ proper waypoint		
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
-
 	}
 	if (timerName == "StartPathing") {
 
-		auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
-		if (movingPlatform == nullptr) {
-			return;
-		}
-			
-					
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+		if (movingPlatformComponent != nullptr)
+			movingPlatformComponent->StartPathing();
+
+
+		// backup logic if needed
+
 		int waypoints[] = {0, 14, 24, 34, 40, 49, 56, 64, 72, 79};
 		int scaledNum = randomNum + (std::rand() % 5);		
 		int waypoint = waypoints[scaledNum];
-		
 
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, false, waypoint, waypoint + 1);
-		
-		
-		self->AddTimer("StartPathing", 270.5f);
+		// GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, false, waypoint, waypoint + 1);	
+		// self->AddTimer("StartPathing", 270.5f);
 	}	
 }
 

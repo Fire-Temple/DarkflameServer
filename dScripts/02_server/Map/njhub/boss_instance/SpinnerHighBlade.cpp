@@ -11,13 +11,20 @@
 #include "SkillComponent.h"
 
 void SpinnerHighBlade::OnStartup(Entity* self) {	
-	
-	self->SetProximityRadius(3.5, "spin_distance");		
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();	
+	self->SetProximityRadius(3.5, "spin_distance");
 	
 	if (self->GetVar<bool>(u"platformStartAtEnd")) {
-		self->AddTimer("MoveUp", 26);		
+		
+		self->SetProximityRadius(5.9, "damage_distance");		
+		self->SetVar<bool>(u"SpinnerIsUp", true);
+
 	} else {
-		self->AddTimer("MoveDown", 26);			
+		self->SetVar<bool>(u"SpinnerIsUp", false);
+		self->SetNetworkVar(u"bIsInUse", false);
+		self->SetVar(u"bActive", true);
+		
+		SpawnLegs(self);
 	}	
 }
 
@@ -67,42 +74,41 @@ void SpinnerHighBlade::OnSkillEventFired(Entity* self, Entity* caster, const std
 //	Check if timed
 	auto ResetTime = self->GetVar<int32_t>(u"reset_time");
 	if (ResetTime >= 1) {	
-		self->AddTimer("MoveDown", ResetTime + 2.5);	
-//		2.5 = rough estimate of movetime for platforms		
+		self->AddTimer("MoveDown", ResetTime + 2);	
+//		give a little extra time	
 	}
 	
 	SpinnerAscend(self);	
 }
 
 void SpinnerHighBlade::SpinnerAscend(Entity* self) {	
-	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(1);
+
 	RenderComponent::PlayAnimation(self, u"up");
-	
-//	Fake skill pulse to avoid instant user damage
-	self->AddTimer("SkillPulse", 1.6f);
-	self->AddTimer("SkillPulse", 2.6f);
-	self->AddTimer("SkillPulse", 3.6f);	
-	
+
 	self->AddTimer("IdleAnim", 1);	
-	self->AddTimer("BladeRadius", 3.5f);
+	self->AddTimer("BladeRadius", 1.5f);
+	self->AddTimer("SkillPulse", 1.6f);	
 	
 //	Ascend sfx
 	GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{7f770ade-b84c-46ad-b3ae-bdbace5985d4}");	
 	self->AddTimer("BladeGUID", 1.4f);		
 }	
 	
-void SpinnerHighBlade::SpinnerDescend(Entity* self) {	
-
+void SpinnerHighBlade::SpinnerDescend(Entity* self) {		
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(0);
+	
 	self->SetVar<bool>(u"SpinnerIsUp", false);
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);		
+		
 	RenderComponent::PlayAnimation(self, u"down");
 	
 //	Descend sfx
 	GameMessages::SendStopNDAudioEmitter(self, self->GetSystemAddress(), "{b1bbe65e-330d-4ef6-a534-63e98dd199ec}");		
 	GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{97b60c03-51f2-45b6-80cc-ccbbef0d94cf}");	
 
-	self->AddTimer("Unlock", 4);		
+	self->AddTimer("Unlock", 1);		
 }
 
 void SpinnerHighBlade::OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) {
@@ -153,17 +159,14 @@ void SpinnerHighBlade::OnTimerDone(Entity* self, std::string timerName) {
 		}		
 	}
 	else if (timerName == "BladeRadius") {		
+//		If ProxRadius activated, should be true anyways		
 		self->SetVar<bool>(u"SpinnerIsUp", true);
-//		^^ If ProxRadius activated, should be true anyways		
-		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();
+
 		self->SetProximityRadius(5.9, "damage_distance");			
 	}			
 	else if (timerName == "IdleAnim") {	
 		RenderComponent::PlayAnimation(self, u"idle-up");
-	}	
-	else if (timerName == "MoveUp") {	
-		SpinnerAscend(self);	
-	}	
+	}
 	else if (timerName == "MoveDown") {	
 		SpinnerDescend(self);
 	}	
@@ -175,6 +178,5 @@ void SpinnerHighBlade::OnTimerDone(Entity* self, std::string timerName) {
 //	Handle blades GUID
 	else if (timerName == "BladeGUID") {
 		GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{b1bbe65e-330d-4ef6-a534-63e98dd199ec}");	
-
 	}		
 }

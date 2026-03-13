@@ -31,7 +31,6 @@ set(DSCRIPTS_SOURCES_02_SERVER_MAP_NJHUB_BOSS_INSTANCE
     	"FtFlameJetServer.cpp"
     	"SpinnerLowBlade.cpp"
     	"SpinnerDart.cpp"
-    	"FtMillstoneCinematic.cpp"
     	"MillstoneEvent.cpp"
     	"Button70.cpp"
     	"SpawnerSpinner71.cpp"

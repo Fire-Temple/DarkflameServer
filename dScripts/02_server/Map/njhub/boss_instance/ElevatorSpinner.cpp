@@ -14,9 +14,6 @@
 Entity* ElevatorSpinner::caster1 = nullptr;
 
 void ElevatorSpinner::OnStartup(Entity* self) {
-	
-//	Force spinner to proper waypoint	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1, 1, eMovementPlatformState::Moving);
 
 	self->SetNetworkVar(u"bIsInUse", false);
 	self->SetVar(u"bActive", true);
@@ -65,7 +62,7 @@ void ElevatorSpinner::OnSkillEventFired(Entity* self, Entity* caster, const std:
 		if (!checkcine.empty()) {
 			auto cine = self->GetVar<std::u16string>(u"cinematic");
 			GameMessages::SendPlayCinematic(caster->GetObjectID(), cine, caster->GetSystemAddress());		
-		}	else if (!checkoffcine.empty()) {
+		} else if (!checkoffcine.empty()) {
 			auto offcine = self->GetVar<std::u16string>(u"off_cinematic");
 			GameMessages::SendPlayCinematic(caster->GetObjectID(), offcine, caster->GetSystemAddress());		
 		}		
@@ -73,7 +70,6 @@ void ElevatorSpinner::OnSkillEventFired(Entity* self, Entity* caster, const std:
 //		End
 
 //	Start correct flourish audio sequence for caster
-
 		const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
 		if (AttachedPath == u"ZSpinner01") {			
 			self->SetNetworkVar(u"lowmed", 1);	
@@ -96,19 +92,15 @@ void ElevatorSpinner::OnSkillEventFired(Entity* self, Entity* caster, const std:
 		}
 //	End
 
-
-
-
-
 		TriggerDrill(self);
 	}
 }
 
 void ElevatorSpinner::TriggerDrill(Entity* self) {
-	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 
 //	Move spinner	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+	movingPlatformComponent->GotoWaypoint(1);
 
 //	Play anim	
 	RenderComponent::PlayAnimation(self, u"up");
@@ -119,38 +111,39 @@ void ElevatorSpinner::TriggerDrill(Entity* self) {
 //	Check if timed spinner
 	auto ResetTime = self->GetVar<int32_t>(u"reset_time");
 	if (ResetTime >= 1) {	
-		self->AddTimer("Return", ResetTime + 2.5);	
-//		2.5 = rough estimate of movetime for the timed platforms using this script			
+		self->AddTimer("Return", ResetTime + 2);	
+//		give a little extra time
 	}
 	
 //	Notify group that spinner deactivated
-	auto DeactivatedGroup = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"group_deactivated_event"));
-	auto DeactivatedEntities = Game::entityManager->GetEntitiesInGroup(DeactivatedGroup);	
-	for (auto* entity : DeactivatedEntities) {	
-//		Reduce unnecessary notifies	
-		if (entity->GetLOT() != 32001 && entity->GetLOT() != 32007 && entity->GetLOT() != 16894) {
+	auto deactivatedGroup = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"group_deactivated_event"));
+	auto deactivatedName = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"name_deactivated_event"));
+	auto deactivatedEntities = Game::entityManager->GetEntitiesInGroup(deactivatedGroup);	
+	
+	for (auto* entity : deactivatedEntities) {
+		if (deactivatedGroup == "FlameJets01" || deactivatedGroup == "FlameJets02") {
+			entity->NotifyObject(self, deactivatedName);
+		
+//		Reduce unnecessary notifies		
+		} else if (entity->GetLOT() != 32001 && entity->GetLOT() != 32007 && entity->GetLOT() != 16894) {
 			entity->NotifyObject(self, "SpinnerDeactivated");	
 		}	
 	}
 	
-//	Check for attached door indicator	
-	auto DeactivatedName = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"name_deactivated_event"));
-	if (DeactivatedName == "spinnerdown1" || DeactivatedName == "spinnerdown2" || DeactivatedName == "spinnerdown3" ||
-	DeactivatedName == "spinnerdown4" || DeactivatedName == "spinnerdown5" || DeactivatedName == "spinnerdown6" || 
-	DeactivatedName == "spinnerdown7" || DeactivatedName == "spinnerdown8") {	
+//	Check for attached door indicator
+	if (deactivatedName == "spinnerdown1" || deactivatedName == "spinnerdown2" || deactivatedName == "spinnerdown3" ||
+	deactivatedName == "spinnerdown4" || deactivatedName == "spinnerdown5" || deactivatedName == "spinnerdown6" || 
+	deactivatedName == "spinnerdown7" || deactivatedName == "spinnerdown8") {	
 		self->AddTimer("TorchOn", 1.0f);
 	}
 }
 
 
 void ElevatorSpinner::OnTimerDone(Entity* self, std::string timerName) {
-
-	if (timerName == "MoveBack") {	
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);		
-	}	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 	
-	else if (timerName == "Return") {
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);		
+	if (timerName == "Return") {
+		movingPlatformComponent->GotoWaypoint(0);	
 		RenderComponent::PlayAnimation(self, u"down");
 		self->AddTimer("DownAnim", 0.1f);
 
@@ -158,15 +151,15 @@ void ElevatorSpinner::OnTimerDone(Entity* self, std::string timerName) {
 		GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{97b60c03-51f2-45b6-80cc-ccbbef0d94cf}");	
 		
 		self->AddTimer("Unlock", 2.5f);
-	}
-	else if (timerName == "Unlock") {	
+		
+	} else if (timerName == "Unlock") {	
 		SpawnLegs(self);
 		self->SetNetworkVar(u"bIsInUse", false);
 		self->SetVar(u"bActive", true);		
-	}
-	else if (timerName == "TorchOn") {	
-//	Activate torches accordingly	
-//	Wont let me do it the easy way lol
+		
+	} else if (timerName == "TorchOn") {	
+//		Activate torches accordingly	
+//		Wont let me do it the easy way lol
 		const auto DeactivatedEvent = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"name_deactivated_event"));
 		const auto SpinnersGroup = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"groupID"));
 		auto groupObjs = Game::entityManager->GetEntitiesByLOT(16894);		
@@ -245,15 +238,9 @@ void ElevatorSpinner::OnTimerDone(Entity* self, std::string timerName) {
 		}
 	}
 
-//Handle spinner sound orders
-//	TODO: Remake onwaypointreached to handle gamemessage version of platform resync since DLU's startpathing is shitty	
-//	^ All just to know when to end Movement sound loop
-	else if (timerName == "MovementGUID") {
-		GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{b91d2f01-1998-4ca3-bb5c-c25cf36c7a24}");	
-		if (!self->GetNetworkVar<bool>(u"bHasArrived")) {
-			self->AddTimer("MovementGUID", 1);
-		}
-	}	
+
+//	TODO use travel sound
+//	travel GUID {b91d2f01-1998-4ca3-bb5c-c25cf36c7a24}	
 }
 
 

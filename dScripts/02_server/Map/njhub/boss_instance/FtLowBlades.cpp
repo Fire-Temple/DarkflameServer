@@ -54,7 +54,7 @@ void FtLowBlades::OnNotifyObject(Entity* self, Entity* sender, const std::string
 		auto* proximityMonitorComponent = self->GetComponent<ProximityMonitorComponent>();		
 		self->SetProximityRadius(5.9, "damage_distance");		
 		self->AddTimer("ProxRadius", 1.1f);		
-		self->AddTimer("ResetDamage", 7.1f);			
+		self->AddTimer("ResetDamage", 6.5f);			
 	}	
 }		
 
@@ -75,9 +75,9 @@ void FtLowBlades::OnTimerDone(Entity* self, std::string timerName) {
 		}
 // End		
 	}
-	else if (timerName == "ProxRadius") {		
+	else if (timerName == "ProxRadius") {
+//		If ProxRadius activated, m_Counter should be 1 anyways		
 		m_Counter = 1;
-//		^^ If ProxRadius activated, m_Counter should be 1 anyways		
 		
 	}	
 	else if (timerName == "ResetDamage") {		
