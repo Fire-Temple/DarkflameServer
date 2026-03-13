@@ -31,7 +31,7 @@ void NjFireRocksManager::CheckForRocks(Entity* self) {
 
 	// wait for all rocks to be ready
 	if (platforms < self->GetVar<int32_t>(u"NumberOfRocks")) {
-		LOG_DEBUG("NjFireRocksManager.cpp waiting for rocks, loaded platforms: %u, for rock group: %s", platforms, rockGroup);
+		LOG_DEBUG("NjFireRocksManager.cpp waiting for rocks, loaded platforms: %u", platforms);
 		self->AddTimer("check", 1);
 		return;
 	}
