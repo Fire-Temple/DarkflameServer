@@ -22,7 +22,11 @@ You will need the launcher executable **LEGO Universe - Unreleased Version (Laun
      
 3. Run the launcher and press the `Install` button to begin. After installation, press `Update`
 	
-4. Once you are up to date, press the `Add Account` button to create a new account
+4. Once you are up to date, press the `Add Account` button. 
+	You will then be asked to create an account and assign that account a GM level between `0` and `9`
+	
+	> Higher GM levels will give the account access to certain chat commands:	
+	> [In-game commands](https://github.com/Fire-Temple/DarkflameServer/blob/main/docs/Commands.md)
 	
 5. Finally, press `Play!` to play
     
