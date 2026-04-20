@@ -3,7 +3,43 @@
 See the original README for DarkflameUniverse License / Server Information:                       
 [Darkflame Universe README](https://github.com/Fire-Temple/DarkflameServer/blob/main/README_original.md)
 
-## Installation / First time setup
+## Installation (via launcher)
+
+### Requirements
+
+#### Launcher
+You will need the launcher executable **LEGO Universe - Unreleased Version (Launcher)**
+	
+	> Launcher may be on Archive.org
+
+### Setup
+
+1. Download the `LEGOUniverseLauncher.exe` executable from Archive.org
+	
+2. Move the executable to an empty folder on your pc
+
+	> You will need at least 15GB of available space   
+     
+3. Run the launcher and press the `Install` button to begin. After installation, press `Update`
+	
+4. Once you are up to date, press the `Add Account` button. 
+	You will then be asked to create an account and assign that account a GM level between `0` and `9`
+	
+	> Higher GM levels will give the account access to certain chat commands:	
+	> [In-game commands](https://github.com/Fire-Temple/DarkflameServer/blob/main/docs/Commands.md)
+	
+5. Finally, press `Play!` to play
+    
+### Additional notes	
+	
+* After setting up, `LEGO_Universe/server/worldconfig.ini`	contains some in-game settings you might find useful
+
+	> Frostburgh, solo racing, etc.
+
+* The `Add Account` button will also allow you to alter existing accounts	
+<br>
+
+## Install using latest release (Alternative)
 
 ### Requirements
 
@@ -11,13 +47,10 @@ See the original README for DarkflameUniverse License / Server Information:
  - [7zip](https://www.7-zip.org/)
 
 #### Client
-You will need the newest client **LEGO Universe - Unreleased Version (Unpacked)** << name may change depending on sources
+You will need a LEGO Universe client like lcdr unpacked **LEGO Universe 1.10.64 (unpacked, Win+Mac, lcdr/humanoid)**
+Along with **LEGO Universe - Unreleased Version (Patch)** to update the client files to 1.11
 
-**OR** If you already have a client like lcdr unpacked (or majority of unpacked clients)
-You may alternatively get the              
-**LEGO Universe - Unreleased Version (Patch)** <- for a smaller download (optional)
-
-	> Clients may or may not be on Archive.org
+	> Clients may be on Archive.org
 
 ### Setup
 
