@@ -23,6 +23,8 @@
 
 #include "CppScripts.h"
 
+#include <limits>
+
 QuickBuildComponent::QuickBuildComponent(Entity* const entity, const int32_t componentID) : Component{ entity, componentID } {
 	std::u16string checkPreconditions = entity->GetVar<std::u16string>(u"CheckPrecondition");
 
@@ -328,7 +330,12 @@ void QuickBuildComponent::SetActivatorPosition(const NiPoint3& value) noexcept {
 }
 
 void QuickBuildComponent::SetResetTime(const float value) noexcept {
-	m_ResetTime = value;
+	if (value < 0) {
+		// easy fix to never reset :)
+		m_ResetTime = std::numeric_limits<float>::max();
+	} else {
+		m_ResetTime = value;
+	}
 }
 
 void QuickBuildComponent::SetCompleteTime(const float value) noexcept {
@@ -365,7 +372,8 @@ void QuickBuildComponent::SetPostImaginationCost(const int32_t value) noexcept {
 
 void QuickBuildComponent::SetTimeBeforeSmash(const float value) noexcept {
 	if (value < 0) {
-		m_TimeBeforeSmash = 10.0f;
+		// easy fix to never reset :)
+		m_TimeBeforeSmash = std::numeric_limits<float>::max();
 	} else {
 		m_TimeBeforeSmash = value;
 	}
