@@ -9,6 +9,7 @@
 #include "TeamManager.h"
 #include "eStateChangeType.h"
 
+#include "ActivityManager.h"
 
 int PlayerCount = 0;
 int BossPlayerCount = 0;
@@ -49,9 +50,8 @@ void FtZoneControl::OnPlayerLoaded(Entity* self, Entity* player) {
 	pos4.SetX(389.5);  
 	pos4.SetY(281.14);  
 	pos4.SetZ(170.5);  		
-		
-	
 
+	
 //	Fill stats
 	auto* destroyableComponent = player->GetComponent<DestroyableComponent>();
 	if (destroyableComponent != nullptr) {
@@ -60,14 +60,12 @@ void FtZoneControl::OnPlayerLoaded(Entity* self, Entity* player) {
 		destroyableComponent->SetImagination(static_cast<int32_t>(destroyableComponent->GetMaxImagination()));
 	}	
 	
-	
 //	Send team size		
 	PlayerCount++;
 	BossPlayerCount++;
 	ChestPlayerCount++;
 	
 	SetPlayerCounts(self);
-
 
 //	Tell client when players loaded
 	self->AddCallbackTimer(0.0f, [self, player, this]() {
@@ -79,6 +77,9 @@ void FtZoneControl::OnPlayerLoaded(Entity* self, Entity* player) {
 		}	
 	});
 
+// 	take imaginite
+// 	technically charging us for shooting gallery, however cost is the same
+	ActivityManager::TakeActivityCost(self, player->GetObjectID());
 }
 
 void FtZoneControl::OnPlayerExit(Entity* self, Entity* player) {	
