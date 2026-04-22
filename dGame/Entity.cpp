@@ -516,7 +516,9 @@ void Entity::Initialize() {
 		// override the factions if needed.
 		const auto setFaction = GetVarAsString(u"set_faction");
 		if (!setFaction.empty()) {
-			// TODO also split on space here however we do not have a general util for splitting on multiple characters yet.
+			// replace spaces so we can split
+			std::replace(setFaction.begin(), setFaction.end(), ' ', ';');
+			
 			const auto factionsToAdd = GeneralUtils::SplitString(setFaction, ';');
 			for (const auto& faction : factionsToAdd) {
 				const auto factionToAdd = GeneralUtils::TryParse<int32_t>(faction);

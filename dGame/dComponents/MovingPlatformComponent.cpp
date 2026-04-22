@@ -131,7 +131,7 @@ MovingPlatformComponent::MovingPlatformComponent(Entity* parent, const int32_t c
 
 		} else if (m_Parent->HasVar(u"attached_path_start")) {
 			PathBehavior behavior = static_cast<PathBehavior>(m_Path->pathBehavior);
-			auto start = m_Parent->GetVar<uint32_t>(u"attached_path_start");
+			auto start = m_Parent->GetVarAs<int32_t>(u"attached_path_start");
 			if (start >= 1 && start <= GetLastWaypointIndex()) {
 				subComponent->mCurrentWaypointIndex = start;
 				subComponent->mPosition = m_Path->pathWaypoints[start].position;
