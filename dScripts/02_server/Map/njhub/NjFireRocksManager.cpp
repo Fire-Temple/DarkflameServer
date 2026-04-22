@@ -38,7 +38,7 @@ void NjFireRocksManager::OnNotifyObject(Entity* self, Entity* sender, const std:
 					if (movingPlatformComponent)
 						movingPlatformComponent->StartPathing();					
 				}
-			}				
+			}
 
 		} else {
 			LOG_DEBUG("NjFireRocksManager.cpp a rock arrived, stopped pathing on that rock");
