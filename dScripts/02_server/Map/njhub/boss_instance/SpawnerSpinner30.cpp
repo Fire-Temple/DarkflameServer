@@ -67,12 +67,9 @@ void SpawnerSpinner30::SpawnBeetles(Entity* self, const std::string& loc) {
 	auto newRot = rot;
 	auto offset = self->GetVarAs<float>(u"hort_offset");
 
-	std::vector<LDFBaseData*> config = { new LDFData<std::string>(u"Leg", loc) };
-
 	EntityInfo info{};
 	info.lot = 13997;
 	info.spawnerID = self->GetObjectID();
-	info.settings = config;
 	info.rot = newRot;
 
 	if (loc == "BeetlesA1") {

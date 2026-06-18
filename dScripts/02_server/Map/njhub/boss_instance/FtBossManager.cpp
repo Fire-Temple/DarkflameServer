@@ -1023,12 +1023,9 @@ void FtBossManager::SpawnMortar(Entity* self, const std::string& loc) {
 	auto newRot = rot;
 	auto offset = self->GetVarAs<float>(u"hort_offset");
 
-	std::vector<LDFBaseData*> config = { new LDFData<std::string>(u"Leg", loc) };
-
 	EntityInfo info{};
 	info.lot = 16891;
 	info.spawnerID = self->GetObjectID();
-	info.settings = config;
 	info.rot = newRot;
 
 	if (loc == "Mortar") {
