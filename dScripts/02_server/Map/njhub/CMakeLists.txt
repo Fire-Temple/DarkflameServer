@@ -22,6 +22,7 @@ set(DSCRIPTS_SOURCES_02_SERVER_MAP_NJHUB
 	"NjJayMissionItems.cpp"
 	"NjNPCMissionSpinjitzuServer.cpp"
 	"NjNyaMissionitems.cpp"
+	"OldManNPC.cpp"
 	"NjScrollChestServer.cpp"
 	"NjWuNPC.cpp"
 	"RainOfArrows.cpp"

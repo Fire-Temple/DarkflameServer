@@ -53,9 +53,10 @@ Spawner::Spawner(const SpawnerInfo info) {
 		}
 		for (Spawner* ssSpawner : spawnSmashSpawnersN) {
 			m_SpawnSmashFoundGroup = true;
-			m_SpawnOnSmash = ssSpawner;
+			m_SpawnOnSmashID = ssSpawner ? ssSpawner->m_Info.spawnerID : LWOOBJID_EMPTY;
 			ssSpawner->AddSpawnedEntityDieCallback([=, this]() {
-				Spawn();
+				// Intentionally left as a non debug log since i have no idea how much stuff this would affect
+				LOG("WOULD HAVE SPAWNED %i", m_EntityInfo.lot);
 				});
 		}
 	}
@@ -185,12 +186,14 @@ void Spawner::Update(const float deltaTime) {
 		}
 		return;
 	}
-	for (size_t i = 0; i < m_WaitTimes.size(); ++i) {
+	for (size_t i = 0; i < m_WaitTimes.size(); ) {
 		m_WaitTimes[i] += deltaTime;
 		if (m_WaitTimes[i] >= m_Info.respawnTime) {
 			m_WaitTimes.erase(m_WaitTimes.begin() + i);
 
 			Spawn();
+		} else {
+			i++;
 		}
 	}
 }
@@ -222,15 +225,18 @@ void Spawner::NotifyOfEntityDeath(const LWOOBJID& objectID) {
 		return;
 	}
 
-	for (size_t i = 0; i < node->entities.size(); ++i) {
+	for (size_t i = 0; i < node->entities.size();) {
 		if (node->entities[i] && node->entities[i] == objectID)
 			node->entities.erase(node->entities.begin() + i);
+		else
+			i++;
 	}
 
 	m_Entities.erase(objectID);
 
-	if (m_SpawnOnSmash != nullptr) {
-		m_SpawnOnSmash->Reset();
+	auto* const spawnOnSmash = Game::zoneManager->GetSpawner(m_SpawnOnSmashID);
+	if (spawnOnSmash) {
+		spawnOnSmash->Reset();
 	}
 }
 

@@ -44,8 +44,7 @@
 #include <ranges>
 
 InventoryComponent::InventoryComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
-	using namespace GameMessages;
-	RegisterMsg<GetObjectReportInfo>(this, &InventoryComponent::OnGetObjectReportInfo);
+	RegisterMsg(&InventoryComponent::OnGetObjectReportInfo);
 	this->m_Dirty = true;
 	this->m_Equipped = {};
 	this->m_Pushed = {};
@@ -174,7 +173,7 @@ void InventoryComponent::AddItem(
 	const uint32_t count,
 	eLootSourceType lootSourceType,
 	eInventoryType inventoryType,
-	const std::vector<LDFBaseData*>& config,
+	const LwoNameValue& config,
 	const LWOOBJID parent,
 	const bool showFlyingLoot,
 	bool isModMoveAndEquip,
@@ -205,7 +204,7 @@ void InventoryComponent::AddItem(
 
 	auto* inventory = GetInventory(inventoryType);
 
-	if (!config.empty() || bound) {
+	if (!config.values.empty() || bound) {
 		const auto slot = preferredSlot != -1 && inventory->IsSlotEmpty(preferredSlot) ? preferredSlot : inventory->FindEmptySlot();
 
 		if (slot == -1) {
@@ -357,7 +356,7 @@ void InventoryComponent::MoveItemToInventory(Item* item, const eInventoryType in
 
 	const auto subkey = item->GetSubKey();
 
-	if (subkey == LWOOBJID_EMPTY && item->GetConfig().empty() && (!item->GetBound() || (item->GetBound() && item->GetInfo().isBOP))) {
+	if (subkey == LWOOBJID_EMPTY && item->GetConfig().values.empty() && (!item->GetBound() || (item->GetBound() && item->GetInfo().isBOP))) {
 		auto left = std::min<uint32_t>(count, origin->GetLotCount(lot));
 
 		while (left > 0) {
@@ -380,11 +379,7 @@ void InventoryComponent::MoveItemToInventory(Item* item, const eInventoryType in
 			isModMoveAndEquip = false;
 		}
 	} else {
-		std::vector<LDFBaseData*> config;
-
-		for (auto* const data : item->GetConfig()) {
-			config.push_back(data->Copy());
-		}
+		const auto config = item->GetConfig();
 
 		const auto delta = std::min<uint32_t>(item->GetCount(), count);
 
@@ -745,18 +740,17 @@ void InventoryComponent::Serialize(RakNet::BitStream& outBitStream, const bool b
 
 			outBitStream.Write0();
 
-			bool flag = !item.config.empty();
+			bool flag = !item.config.values.empty();
 			outBitStream.Write(flag);
 			if (flag) {
 				RakNet::BitStream ldfStream;
-				ldfStream.Write<int32_t>(item.config.size()); // Key count
-				for (LDFBaseData* data : item.config) {
+				ldfStream.Write<int32_t>(item.config.values.size()); // Key count
+				for (const auto& data : item.config.values | std::views::values) {
 					if (data->GetKey() == u"assemblyPartLOTs") {
 						std::string newRocketStr = data->GetValueAsString() + ";";
 						GeneralUtils::ReplaceInString(newRocketStr, "+", ";");
-						LDFData<std::u16string>* ldf_data = new LDFData<std::u16string>(u"assemblyPartLOTs", GeneralUtils::ASCIIToUTF16(newRocketStr));
-						ldf_data->WriteToPacket(ldfStream);
-						delete ldf_data;
+						LDFData<std::u16string> ldf_data(u"assemblyPartLOTs", GeneralUtils::ASCIIToUTF16(newRocketStr));
+						ldf_data.WriteToPacket(ldfStream);
 					} else {
 						data->WriteToPacket(ldfStream);
 					}
@@ -783,7 +777,7 @@ void InventoryComponent::Update(float deltaTime) {
 	}
 }
 
-void InventoryComponent::UpdateSlot(const std::string& location, EquippedItem item, bool keepCurrent) {
+void InventoryComponent::UpdateSlot(const std::string& location, const EquippedItem& item, bool keepCurrent) {
 	const auto index = m_Equipped.find(location);
 
 	if (index != m_Equipped.end()) {
@@ -967,8 +961,9 @@ void InventoryComponent::EquipScripts(Item* equippedItem) {
 		auto* itemScript = CppScripts::GetScript(m_Parent, scriptCompData.script_name);
 		if (!itemScript) {
 			LOG("null script?");
+		} else {
+			itemScript->OnFactionTriggerItemEquipped(m_Parent, equippedItem->GetId());
 		}
-		itemScript->OnFactionTriggerItemEquipped(m_Parent, equippedItem->GetId());
 	}
 }
 
@@ -982,8 +977,9 @@ void InventoryComponent::UnequipScripts(Item* unequippedItem) {
 		auto* itemScript = CppScripts::GetScript(m_Parent, scriptCompData.script_name);
 		if (!itemScript) {
 			LOG("null script?");
+		} else {
+			itemScript->OnFactionTriggerItemUnequipped(m_Parent, unequippedItem->GetId());
 		}
-		itemScript->OnFactionTriggerItemUnequipped(m_Parent, unequippedItem->GetId());
 	}
 }
 
@@ -1079,7 +1075,7 @@ void InventoryComponent::PushEquippedItems() {
 }
 
 void InventoryComponent::PopEquippedItems() {
-	auto current = m_Equipped;
+	const auto current = m_Equipped;
 
 	for (const auto& pair : current) {
 		auto* const item = FindItemById(pair.second.id);
@@ -1634,7 +1630,7 @@ void InventoryComponent::LoadPetXml(const tinyxml2::XMLDocument& document) {
 		DatabasePet databasePet;
 		databasePet.lot = lot;
 		databasePet.moderationState = moderationStatus;
-		databasePet.name = std::string(name);
+		databasePet.name = name ? name : "";
 
 		SetDatabasePet(id, databasePet);
 
@@ -1847,9 +1843,8 @@ std::string DebugInvToString(const eInventoryType inv, bool verbose) {
 	return "";
 }
 
-bool InventoryComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
-	auto& report = static_cast<GameMessages::GetObjectReportInfo&>(msg);
-	auto& cmpt = report.info->PushDebug("Inventory");
+bool InventoryComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
+	auto& cmpt = reportInfo.info->PushDebug("Inventory");
 	cmpt.PushDebug<AMFIntValue>("Component ID") = GetComponentID();
 	uint32_t numItems = 0;
 	for (auto* inventory : m_Inventories | std::views::values) numItems += inventory->GetItems().size();
@@ -1859,7 +1854,7 @@ bool InventoryComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
 	for (const auto& [id, inventoryMut] : m_Inventories) {
 		if (!inventoryMut) continue;
 		const auto* const inventory = inventoryMut;
-		auto& curInv = itemsInBags.PushDebug(DebugInvToString(id, report.bVerbose) + " - " + std::to_string(id));
+		auto& curInv = itemsInBags.PushDebug(DebugInvToString(id, reportInfo.bVerbose) + " - " + std::to_string(id));
 		for (uint32_t i = 0; i < inventory->GetSize(); i++) {
 			const auto* const item = inventory->FindItemBySlot(i);
 			if (!item) continue;
@@ -1876,7 +1871,7 @@ bool InventoryComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
 			slot.PushDebug<AMFBoolValue>("Bind on equip") = item->GetInfo().isBOE;
 			slot.PushDebug<AMFBoolValue>("Is currently bound") = item->GetBound();
 			auto& extra = slot.PushDebug("Extra Info");
-			for (const auto* const setting : item->GetConfig()) {
+			for (const auto& setting : item->GetConfig().values | std::views::values) {
 				if (setting) extra.PushDebug<AMFStringValue>(GeneralUtils::UTF16ToWTF8(setting->GetKey())) = setting->GetValueAsString();
 			}
 		}
@@ -1892,7 +1887,7 @@ bool InventoryComponent::OnGetObjectReportInfo(GameMessages::GameMsg& msg) {
 		equipSlot.PushDebug<AMFIntValue>("Slot") = info.slot;
 		equipSlot.PushDebug<AMFIntValue>("Count") = info.count;
 		auto& extra = equipSlot.PushDebug("Extra Info");
-		for (const auto* const setting : info.config) {
+		for (const auto& setting : info.config.values | std::views::values) {
 			if (setting) extra.PushDebug<AMFStringValue>(GeneralUtils::UTF16ToWTF8(setting->GetKey())) = setting->GetValueAsString();
 		}
 	}

@@ -24,7 +24,6 @@
 #include "SkillComponent.h"
 #include "QuickBuildComponent.h"
 #include "DestroyableComponent.h"
-#include "Metrics.hpp"
 #include "CDComponentsRegistryTable.h"
 #include "CDPhysicsComponentTable.h"
 #include "dNavMesh.h"
@@ -34,10 +33,7 @@
 #include "dZoneManager.h"
 
 BaseCombatAIComponent::BaseCombatAIComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
-	{
-		using namespace GameMessages;
-		RegisterMsg<GetObjectReportInfo>(this, &BaseCombatAIComponent::MsgGetObjectReportInfo);
-	}
+	RegisterMsg(&BaseCombatAIComponent::MsgGetObjectReportInfo);
 	m_Target = LWOOBJID_EMPTY;
 	m_DirtyStateOrTarget = true;
 	m_State = AiState::spawn;
@@ -218,8 +214,10 @@ void BaseCombatAIComponent::Update(const float deltaTime) {
 	}
 
 	if (stunnedThisFrame) {
-		m_MovementAI->Stop();
+		if (!m_MovementAI->IsPaused()) m_MovementAI->Pause();
 
+		// in this case we just become unstunned so check if we paused and resume if we did
+		if (!m_Stunned && m_MovementAI->IsPaused()) m_MovementAI->Resume();
 		return;
 	}
 
@@ -325,12 +323,14 @@ void BaseCombatAIComponent::CalculateCombat(const float deltaTime) {
 		SetAiState(AiState::aggro);
 	} else {
 		SetAiState(AiState::idle);
+		if (m_MovementAI) m_MovementAI->SetMaxSpeed(1.0f);
 	}
 
 	if (!hasSkillToCast) return;
 
 	if (m_Target == LWOOBJID_EMPTY) {
 		SetAiState(AiState::idle);
+		if (m_MovementAI) m_MovementAI->SetMaxSpeed(1.0f);
 
 		return;
 	}
@@ -485,6 +485,7 @@ std::vector<LWOOBJID> BaseCombatAIComponent::GetTargetWithinAggroRange() const {
 
 	for (auto id : m_Parent->GetTargetsInPhantom()) {
 		auto* other = Game::entityManager->GetEntity(id);
+		if (!other) continue;
 
 		const auto distance = Vector3::DistanceSquared(m_Parent->GetPosition(), other->GetPosition());
 
@@ -622,6 +623,11 @@ void BaseCombatAIComponent::ClearThreat() {
 
 void BaseCombatAIComponent::Wander() {
 	if (!m_MovementAI->AtFinalWaypoint()) {
+		return;
+	}
+
+	// If we have a path to follow we should almost certainly do that instead of wandering.
+	if (m_MovementAI->HasPath()) {
 		return;
 	}
 
@@ -880,10 +886,9 @@ void BaseCombatAIComponent::IgnoreThreat(const LWOOBJID threat, const float valu
 	m_Target = LWOOBJID_EMPTY;
 }
 
-bool BaseCombatAIComponent::MsgGetObjectReportInfo(GameMessages::GameMsg& msg) {
+bool BaseCombatAIComponent::MsgGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
 	using enum AiState;
-	auto& reportMsg = static_cast<GameMessages::GetObjectReportInfo&>(msg);
-	auto& cmptType = reportMsg.info->PushDebug("Base Combat AI");
+	auto& cmptType = reportInfo.info->PushDebug("Base Combat AI");
 	cmptType.PushDebug<AMFIntValue>("Component ID") = GetComponentID();
 	auto& targetInfo = cmptType.PushDebug("Current Target Info");
 	targetInfo.PushDebug<AMFStringValue>("Current Target ID") = std::to_string(m_Target);
@@ -901,12 +906,12 @@ bool BaseCombatAIComponent::MsgGetObjectReportInfo(GameMessages::GameMsg& msg) {
 	// roundInfo.PushDebug<AMFDoubleValue>("Combat Start Delay") = m_CombatStartDelay;
 	std::string curState;
 	switch (m_State) {
-		case idle: curState = "Idling"; break;
-		case aggro: curState = "Aggroed"; break;
-		case tether: curState = "Returning to Tether"; break;
-		case spawn: curState = "Spawn"; break;
-		case dead: curState = "Dead"; break;
-		default: curState = "Unknown or Undefined"; break;
+	case idle: curState = "Idling"; break;
+	case aggro: curState = "Aggroed"; break;
+	case tether: curState = "Returning to Tether"; break;
+	case spawn: curState = "Spawn"; break;
+	case dead: curState = "Dead"; break;
+	default: curState = "Unknown or Undefined"; break;
 	}
 	cmptType.PushDebug<AMFStringValue>("Current Combat State") = curState;
 

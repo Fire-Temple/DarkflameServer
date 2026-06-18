@@ -13,7 +13,7 @@
 #include "dpShapeSphere.h"
 #include "dZoneManager.h"
 #include "EntityInfo.h"
-#include "Metrics.hpp"
+#include "Metrics.h"
 #include "PlayerManager.h"
 #include "SlashCommandHandler.h"
 #include "UserManager.h"
@@ -804,7 +804,7 @@ namespace DEVGMCommands {
 		info.spawner = nullptr;
 		info.spawnerID = entity->GetObjectID();
 		info.spawnerNodeID = 0;
-		info.settings = { new LDFData<bool>(u"SpawnedFromSlashCommand", true) };
+		info.settings.Insert<bool>(u"SpawnedFromSlashCommand", true);
 
 		Entity* newEntity = Game::entityManager->CreateEntity(info, nullptr);
 
@@ -827,7 +827,7 @@ namespace DEVGMCommands {
 		}
 
 		const auto numberToSpawnOptional = GeneralUtils::TryParse<uint32_t>(splitArgs[1]);
-		if (!numberToSpawnOptional && numberToSpawnOptional.value() > 0) {
+		if (!numberToSpawnOptional) {
 			ChatPackets::SendSystemMessage(sysAddr, u"Invalid number of enemies to spawn.");
 			return;
 		}
@@ -835,7 +835,7 @@ namespace DEVGMCommands {
 
 		// Must spawn within a radius of at least 0.0f
 		const auto radiusToSpawnWithinOptional = GeneralUtils::TryParse<float>(splitArgs[2]);
-		if (!radiusToSpawnWithinOptional && radiusToSpawnWithinOptional.value() < 0.0f) {
+		if (!radiusToSpawnWithinOptional || radiusToSpawnWithinOptional.value() < 0.0f) {
 			ChatPackets::SendSystemMessage(sysAddr, u"Invalid radius to spawn within.");
 			return;
 		}
@@ -846,7 +846,7 @@ namespace DEVGMCommands {
 		info.spawner = nullptr;
 		info.spawnerID = entity->GetObjectID();
 		info.spawnerNodeID = 0;
-		info.settings = { new LDFData<bool>(u"SpawnedFromSlashCommand", true) };
+		info.settings.Insert(u"SpawnedFromSlashCommand", true);
 
 		auto playerPosition = entity->GetPosition();
 		while (numberToSpawn > 0) {
@@ -1144,6 +1144,10 @@ namespace DEVGMCommands {
 		}
 
 		const auto& password = splitArgs[2];
+		if (password.length() >= 50) {
+			ChatPackets::SendSystemMessage(sysAddr, u"Password is too long.");
+			return;
+		}
 
 		ZoneInstanceManager::Instance()->CreatePrivateZone(Game::server, zone.value(), clone.value(), password);
 
@@ -1275,10 +1279,10 @@ namespace DEVGMCommands {
 		auto* inventoryComponent = entity->GetComponent<InventoryComponent>();
 		if (!inventoryComponent) return;
 
-		std::vector<LDFBaseData*> data{};
-		data.push_back(new LDFData<int32_t>(u"reforgedLOT", reforgedItem.value()));
+		LwoNameValue config;
+		config.Insert<LOT>(u"reforgedLOT", reforgedItem.value());
 
-		inventoryComponent->AddItem(baseItem.value(), 1, eLootSourceType::MODERATION, eInventoryType::INVALID, data);
+		inventoryComponent->AddItem(baseItem.value(), 1, eLootSourceType::MODERATION, eInventoryType::INVALID, config);
 	}
 
 	void Crash(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
@@ -1295,18 +1299,14 @@ namespace DEVGMCommands {
 		response.Insert("serverInfo", true);
 		auto* info = response.InsertArray("data");
 		for (const auto variable : Metrics::GetAllMetrics()) {
-			auto& metricData = info->PushDebug(StringifiedEnum::ToString(variable));
+			auto& metricData = info->PushDebug(Metrics::MetricVariableToString(variable));
 
-			auto* metric = Metrics::GetMetric(variable);
+			const auto& metric = Metrics::GetMetric(variable);
 
-			if (metric == nullptr) {
-				continue;
-			}
-
-			metricData.PushDebug<AMFStringValue>("Maximum") = std::to_string(Metrics::ToMiliseconds(metric->max)) + "ms";
-			metricData.PushDebug<AMFStringValue>("Minimum") = std::to_string(Metrics::ToMiliseconds(metric->min)) + "ms";
-			metricData.PushDebug<AMFStringValue>("Average") = std::to_string(Metrics::ToMiliseconds(metric->average)) + "ms";
-			metricData.PushDebug<AMFStringValue>("Measurements Count") = std::to_string(metric->measurementSize);
+			metricData.PushDebug<AMFStringValue>("Maximum") = std::to_string(Metrics::ToMiliseconds(metric.max)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Minimum") = std::to_string(Metrics::ToMiliseconds(metric.min)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Average") = std::to_string(Metrics::ToMiliseconds(metric.average)) + "ms";
+			metricData.PushDebug<AMFStringValue>("Measurements Count") = std::to_string(metric.measurementSize);
 		}
 		auto& processInfo = info->PushDebug("Process Info");
 		processInfo.PushDebug<AMFStringValue>("Peak RSS") = std::to_string(static_cast<double>(Metrics::GetPeakRSS()) / 1.024e6) + "MB";

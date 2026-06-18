@@ -228,13 +228,14 @@ void AmSkullkinDrill::OnTimerDone(Entity* self, std::string timerName) {
 Entity* AmSkullkinDrill::GetStandObj(Entity* self) {
 	const auto& myGroup = self->GetGroups();
 
-	if (myGroup.empty()) {
+	if (myGroup.empty() || myGroup[0].empty()) {
 		return nullptr;
 	}
+	const auto& group = myGroup[0];
 
 	std::string groupName = "Drill_Stand_";
 
-	groupName.push_back(myGroup[0][myGroup[0].size() - 1]);
+	groupName.push_back(group.back());
 
 	const auto standObjs = Game::entityManager->GetEntitiesInGroup(groupName);
 
