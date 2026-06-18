@@ -44,7 +44,6 @@ jobs:
       uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956 # v10.9
       with:
         workflowPreset: "${{ matrix.debug_preset }}"
-        configurePresetAdditionalArgs: '["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"]'
 
     - name: Extract Linux debug symbols
       if: matrix.os == 'ubuntu-24.04'

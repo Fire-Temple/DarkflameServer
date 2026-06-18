@@ -130,19 +130,15 @@
 			"binaryDir": "${sourceDir}/build/gnu-debug"
 		},
 		{
-		  "name": "linux-gnu-relwithdebinfo",
-		  "inherits": [
-			"linux-config",
-			"gnu-config",
-			"relwithdebinfo-config"
-		  ],
-		  "displayName": "[RelWithDebInfo] Linux (GNU)",
-		  "description": "Create a release build with debug info using the GNU toolchain for Linux",
-		  "binaryDir": "${sourceDir}/build/gnu-relwithdebinfo",
-
-		  "cacheVariables": {
-			"CMAKE_POLICY_VERSION_MINIMUM": "3.5"
-		  }
+			"name": "linux-gnu-relwithdebinfo",
+			"inherits": [
+				"linux-config",
+				"gnu-config",
+				"relwithdebinfo-config"
+			],
+			"displayName": "[RelWithDebInfo] Linux (GNU)",
+			"description": "Create a release build with debug info using the GNU toolchain for Linux",
+			"binaryDir": "${sourceDir}/build/gnu-relwithdebinfo"
 		},
 		{
 			"name": "linux-gnu-release",
