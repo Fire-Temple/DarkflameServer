@@ -693,7 +693,7 @@ namespace {
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS.lua", []() {return new NjFireRocks();}},
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS_MANAGER.lua", []() {return new NjFireRocksManager();}},		
 		{"scripts\\02_server\\Map\\General\\L_SIMPLE_MOVER_SWITCH.lua", []() {return new SimpleMoverSwitch();}},	
-		{"scripts\\02_server\\Map\\njhub\\L_OLD_MAN_NPC.lua", []() {return new NjOldManNPC();}},	
+		{"scripts\\02_server\\Map\\njhub\\L_OLD_MAN_NPC.lua", []() {return new OldManNPC();}},	
 
 
 		//DLU
