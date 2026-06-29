@@ -4,14 +4,17 @@
 #include "ControllablePhysicsComponent.h"
 #include "EntityManager.h"
 #include "SimplePhysicsComponent.h"
+#include "Amf3.h"
+#include "dpShapeSphere.h"
 
 const std::unordered_set<LWOOBJID> ProximityMonitorComponent::m_EmptyObjectSet = {};
 
-ProximityMonitorComponent::ProximityMonitorComponent(Entity* parent, int radiusSmall, int radiusLarge) : Component(parent) {
+ProximityMonitorComponent::ProximityMonitorComponent(Entity* parent, const int32_t componentID, int radiusSmall, int radiusLarge) : Component(parent, componentID) {
 	if (radiusSmall != -1 && radiusLarge != -1) {
 		SetProximityRadius(radiusSmall, "rocketSmall");
 		SetProximityRadius(radiusLarge, "rocketLarge");
 	}
+	RegisterMsg(&ProximityMonitorComponent::OnGetObjectReportInfo);
 }
 
 ProximityMonitorComponent::~ProximityMonitorComponent() {
@@ -58,6 +61,31 @@ bool ProximityMonitorComponent::IsInProximity(const std::string& name, LWOOBJID 
 	const auto& collisions = iter->second->GetCurrentlyCollidingObjects();
 
 	return collisions.contains(objectID);
+}
+
+bool ProximityMonitorComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
+	auto& proxInfo = reportInfo.info->PushDebug("Proximity Monitor");
+	for (const auto& [name, entity] : m_ProximitiesData) {
+		if (!entity) continue;
+		auto& proxAmf = proxInfo.PushDebug(name);
+		const auto* const shape = entity->GetShape();
+		if (shape && shape->GetShapeType() == dpShapeType::Sphere) {
+			const auto* const sphere = static_cast<const dpShapeSphere*>(shape);
+			proxAmf.PushDebug<AMFDoubleValue>("Radius") = sphere->GetRadius();
+		}
+		proxAmf.PushDebug<AMFBoolValue>("Sleeping") = entity->GetSleeping();
+		proxAmf.PushDebug<AMFDoubleValue>("Scale") = entity->GetScale();
+		proxAmf.PushDebug<AMFBoolValue>("Gargantuan") = entity->GetIsGargantuan();
+		proxAmf.PushDebug<AMFBoolValue>("Static") = entity->GetIsStatic();
+		proxAmf.PushDebug("Position").PushDebug(entity->GetPosition());
+		proxAmf.PushDebug("Rotation").PushDebug(entity->GetRotation());
+		auto& collidingAmf = proxAmf.PushDebug("Colliding Objects");
+		for (const auto& colliding : entity->GetCurrentlyCollidingObjects()) {
+			collidingAmf.PushDebug(std::to_string(colliding));
+		}
+	}
+
+	return true;
 }
 
 void ProximityMonitorComponent::Update(float deltaTime) {

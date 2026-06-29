@@ -17,7 +17,7 @@
 #include "ePropertySortType.h"
 #include "User.h"
 
-PropertyEntranceComponent::PropertyEntranceComponent(Entity* parent, uint32_t componentID) : Component(parent) {
+PropertyEntranceComponent::PropertyEntranceComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	this->propertyQueries = {};
 
 	auto table = CDClientManager::GetTable<CDPropertyEntranceComponentTable>();
@@ -131,11 +131,11 @@ void PropertyEntranceComponent::OnPropertyEntranceSync(Entity* entity, bool incl
 
 	const auto lookupResult = Database::Get()->GetProperties(propertyLookup);
 
-	for (const auto& propertyEntry : lookupResult->entries) {
+	for (const auto& propertyEntry : lookupResult.entries) {
 		const auto owner = propertyEntry.ownerId;
 		const auto otherCharacter = Database::Get()->GetCharacterInfo(owner);
 		if (!otherCharacter.has_value()) {
-			LOG("Failed to find property owner name for %u!", owner);
+			LOG("Failed to find property owner name for %llu!", owner);
 			continue;
 		}
 		auto& entry = entries.emplace_back();
@@ -174,5 +174,5 @@ void PropertyEntranceComponent::OnPropertyEntranceSync(Entity* entity, bool incl
 	}
 
 	// Query here is to figure out whether or not to display the button to go to the next page or not.
-	GameMessages::SendPropertySelectQuery(m_Parent->GetObjectID(), startIndex, lookupResult->totalEntriesMatchingQuery - (startIndex + numResults) > 0, character->GetPropertyCloneID(), false, true, entries, sysAddr);
+	GameMessages::SendPropertySelectQuery(m_Parent->GetObjectID(), startIndex, lookupResult.totalEntriesMatchingQuery - (startIndex + numResults) > 0, character->GetPropertyCloneID(), false, true, entries, sysAddr);
 }

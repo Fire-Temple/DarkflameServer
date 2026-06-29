@@ -16,13 +16,13 @@ class LUPExhibitComponent final : public Component
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::LUP_EXHIBIT;
 
-	LUPExhibitComponent(Entity* parent) : Component(parent) {};
+	LUPExhibitComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {};
 	void Update(float deltaTime) override;
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
 	void NextLUPExhibit();
 private:
 	float m_UpdateTimer = 0.0f;
-	std::array<LOT, 4> m_LUPExhibits = { 11121, 11295, 11423, 11979 };
+	const std::array<LOT, 4> m_LUPExhibits = { 11121, 11295, 11423, 11979 };
 	uint8_t m_LUPExhibitIndex = 0;
 	bool m_DirtyLUPExhibit = true;
 };

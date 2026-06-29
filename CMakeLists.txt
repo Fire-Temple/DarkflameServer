@@ -15,10 +15,12 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 	# Export the compile commands for debugging
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) 	# Set CMAKE visibility policy to NEW on project and subprojects
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON) # Set C and C++ symbol visibility to hide inlined functions
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+set(FETCHCONTENT_QUIET FALSE) # GLM takes a long time to clone, this will at least show _something_ while its downloading
 
 # Read variables from file
 FILE(READ "${CMAKE_SOURCE_DIR}/CMakeVariables.txt" variables)
@@ -66,7 +68,11 @@ set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
 # Disabled no-register
 # Disabled unknown pragmas because Linux doesn't understand Windows pragmas.
 if(UNIX)
-	add_link_options("-Wl,-rpath,$ORIGIN/")
+	if(APPLE)
+		add_link_options("-Wl,-rpath,@loader_path/")
+	else()
+		add_link_options("-Wl,-rpath,$ORIGIN/")
+	endif()
 	add_compile_options("-fPIC")
 	add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0 _GLIBCXX_USE_CXX17_ABI=0)
 
@@ -320,7 +326,7 @@ add_subdirectory(dServer)
 add_subdirectory(dWeb)
 
 # Create a list of common libraries shared between all binaries
-set(COMMON_LIBRARIES "dCommon" "dDatabase" "dNet" "raknet" "magic_enum")
+set(COMMON_LIBRARIES glm::glm "dCommon" "dDatabase" "dNet" "raknet" "magic_enum")
 
 # Add platform specific common libraries
 if(UNIX)

@@ -22,6 +22,7 @@
 #include "eInventoryType.h"
 #include "eReplicaComponentType.h"
 #include "eLootSourceType.h"
+#include "Loot.h"
 
 class Entity;
 class ItemSet;
@@ -29,6 +30,10 @@ class ItemSet;
 typedef std::map<std::string, EquippedItem> EquipmentMap;
 
 enum class eItemType : int32_t;
+
+namespace GameMessages {
+	struct GetObjectReportInfo;
+}
 
 /**
  * Handles the inventory of entity, including the items they possess and have equipped. An entity can have inventories
@@ -67,7 +72,7 @@ public:
 	static constexpr uint32_t MaximumGroupCount = 50;
 
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::INVENTORY;
-	InventoryComponent(Entity* parent);
+	InventoryComponent(Entity* parent, const int32_t componentID);
 
 	void Update(float deltaTime) override;
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
@@ -129,7 +134,7 @@ public:
 		uint32_t count,
 		eLootSourceType lootSourceType = eLootSourceType::NONE,
 		eInventoryType inventoryType = INVALID,
-		const std::vector<LDFBaseData*>& config = {},
+		const LwoNameValue& config = {},
 		LWOOBJID parent = LWOOBJID_EMPTY,
 		bool showFlyingLoot = true,
 		bool isModMoveAndEquip = false,
@@ -200,7 +205,7 @@ public:
 	 * @param loot a map of items to add and how many to add
 	 * @return whether the entity has enough space for all the items
 	 */
-	bool HasSpaceForLoot(const std::unordered_map<LOT, int32_t>& loot);
+	bool HasSpaceForLoot(const Loot::Return& loot);
 
 	/**
 	 * Equips an item in the specified slot
@@ -208,7 +213,7 @@ public:
 	 * @param item the item to place
 	 * @param keepCurrent stores the item in an additional temp slot if there's already an item equipped
 	 */
-	void UpdateSlot(const std::string& location, EquippedItem item, bool keepCurrent = false);
+	void UpdateSlot(const std::string& location, const EquippedItem& item, bool keepCurrent = false);
 
 	/**
 	 * Removes a slot from the inventory
@@ -402,9 +407,15 @@ public:
 	bool SetSkill(BehaviorSlot slot, uint32_t skillId);
 
 	void UpdateGroup(const GroupUpdate& groupUpdate);
-	void RemoveGroup(const std::string& groupId);
+
+	std::unordered_map<LWOOBJID, DatabasePet>& GetPetsMut() { return m_Pets; };
 
 	void FixInvisibleItems();
+
+	// Used to migrate a character version, no need to call outside of that context
+	void RegenerateItemIDs();
+
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
 
 	~InventoryComponent() override;
 

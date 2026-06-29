@@ -5,6 +5,11 @@
 #include "NiPoint3.h"
 #include "NiQuaternion.h"
 
+namespace GameMessages {
+	struct GetObjectReportInfo;
+	struct GetPosition;
+};
+
 namespace Raknet {
 	class BitStream;
 };
@@ -15,7 +20,7 @@ class dpEntity;
 
 class PhysicsComponent : public Component {
 public:
-	PhysicsComponent(Entity* parent, int32_t componentId);
+	PhysicsComponent(Entity* parent, const int32_t componentID);
 	virtual ~PhysicsComponent() = default;
 
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
@@ -29,17 +34,19 @@ public:
 	int32_t GetCollisionGroup() const noexcept { return m_CollisionGroup; }
 	void SetCollisionGroup(int32_t group) noexcept { m_CollisionGroup = group; }
 protected:
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& msg);
+
 	dpEntity* CreatePhysicsEntity(eReplicaComponentType type);
 
 	dpEntity* CreatePhysicsLnv(const float scale, const eReplicaComponentType type) const;
 
 	void SpawnVertices(dpEntity* entity) const;
 
-	bool OnGetPosition(GameMessages::GameMsg& msg);
+	bool OnGetPosition(GameMessages::GetPosition& msg);
 
 	NiPoint3 m_Position;
 
-	NiQuaternion m_Rotation;
+	NiQuaternion m_Rotation = QuatUtils::IDENTITY;
 
 	bool m_DirtyPosition;
 

@@ -7,10 +7,14 @@
 
 class NiPoint3;
 
+namespace tinyxml2 {
+	class XMLDocument;
+}
+
 class GhostComponent final : public Component {
 public:
 	static inline const eReplicaComponentType ComponentType = eReplicaComponentType::GHOST;
-	GhostComponent(Entity* parent);
+	GhostComponent(Entity* parent, const int32_t componentID);
 	~GhostComponent() override;
 
 	void SetGhostOverride(bool value) { m_GhostOverride = value; };
@@ -39,7 +43,14 @@ public:
 
 	void GhostEntity(const LWOOBJID id);
 
+	bool OnToggleGMInvis(GameMessages::ToggleGMInvis& msg);
+
+	bool OnGetGMInvis(GameMessages::GetGMInvis& msg);
+	
+	bool MsgGetObjectReportInfo(GameMessages::GetObjectReportInfo& msg);
+
 private:
+
 	NiPoint3 m_GhostReferencePoint;
 
 	NiPoint3 m_GhostOverridePoint;
@@ -49,6 +60,9 @@ private:
 	std::unordered_set<LWOOBJID> m_LimboConstructions;
 
 	bool m_GhostOverride;
+
+	bool m_IsGMInvisible{ false };
+	
 };
 
 #endif  //!__GHOSTCOMPONENT__H__

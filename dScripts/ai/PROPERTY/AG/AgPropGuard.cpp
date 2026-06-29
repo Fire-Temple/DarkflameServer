@@ -24,7 +24,7 @@ void AgPropGuard::OnMissionDialogueOK(Entity* self, Entity* target, int missionI
 
 			if (id) {
 				inventoryComponent->UnEquipItem(id);
-				inventoryComponent->RemoveItem(id->GetLot(), id->GetCount());
+				inventoryComponent->RemoveItem(id->GetLot(), id->GetCount(), eInventoryType::ALL);
 			}
 		}
 	} else if (
@@ -33,7 +33,8 @@ void AgPropGuard::OnMissionDialogueOK(Entity* self, Entity* target, int missionI
 		) {
 		//GameMessages::SendNotifyClientObject(Game::entityManager->GetZoneControlEntity()->GetObjectID(), u"GuardChat", target->GetObjectID(), 0, target->GetObjectID(), "", target->GetSystemAddress());
 
-		target->GetCharacter()->SetPlayerFlag(113, true);
+		auto* const character = target->GetCharacter();
+		if (character) character->SetPlayerFlag(113, true);
 
 		Game::entityManager->GetZoneControlEntity()->AddTimer("GuardFlyAway", 1.0f);
 	}

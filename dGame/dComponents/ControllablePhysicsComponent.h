@@ -1,16 +1,18 @@
 #ifndef CONTROLLABLEPHYSICSCOMPONENT_H
 #define CONTROLLABLEPHYSICSCOMPONENT_H
 
+#include "PhysicsComponent.h"
+#include "eReplicaComponentType.h"
 #include "dCommonVars.h"
 #include "RakNetTypes.h"
 #include "NiPoint3.h"
 #include "NiQuaternion.h"
-#include "tinyxml2.h"
-#include "PhysicsComponent.h"
 #include "dpCollisionChecks.h"
-#include "PhantomPhysicsComponent.h"
 #include "eBubbleType.h"
-#include "eReplicaComponentType.h"
+
+namespace tinyxml2 {
+	class XMLDocument;
+}
 
 class Entity;
 class dpEntity;
@@ -23,7 +25,7 @@ class ControllablePhysicsComponent : public PhysicsComponent {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::CONTROLLABLE_PHYSICS;
 
-	ControllablePhysicsComponent(Entity* entity, int32_t componentId);
+	ControllablePhysicsComponent(Entity* entity, const int32_t componentID);
 	~ControllablePhysicsComponent() override;
 
 	void Update(float deltaTime) override;
@@ -281,6 +283,8 @@ public:
 	const bool GetImmuneToStunUseItem() { return m_ImmuneToStunUseItemCount > 0;};
 
 private:
+
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
 	/**
 	 * The entity that owns this component
 	 */
@@ -374,7 +378,7 @@ private:
 	/**
 	 * The active speed boost for this entity
 	 */
-	float m_SpeedBoost;
+	float m_SpeedBoost = 500.0f;
 
 	/*
 	* If Bubble info is dirty

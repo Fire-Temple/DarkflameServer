@@ -20,6 +20,7 @@
 #include "dServer.h"
 #include "dZoneManager.h"
 
+
 namespace {
 	std::map<std::string, Command> CommandInfos;
 	std::map<std::string, Command> RegisteredCommands;
@@ -154,7 +155,7 @@ void SlashCommandHandler::SendAnnouncement(const std::string& title, const std::
 
 	//Notify chat about it
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::GM_ANNOUNCE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::GM_ANNOUNCE);
 
 	bitStream.Write<uint32_t>(title.size());
 	for (auto character : title) {
@@ -412,6 +413,15 @@ void SlashCommandHandler::Startup() {
 		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
 	RegisterCommand(ReloadConfigCommand);
+
+	Command ReloadCommand{
+		.help = "Unloads all maps, reloads yours",
+		.info = "Unloads all maps, reloads your current map. All other users will be booted to login",
+		.aliases = { "reload" },
+		.handle = DEVGMCommands::Reload,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(ReloadCommand);
 
 	Command ForceSaveCommand{
 		.help = "Force save your player",
@@ -817,6 +827,15 @@ void SlashCommandHandler::Startup() {
 	};
 	RegisterCommand(DeleteInvenCommand);
 
+	Command ExecuteCommand{
+		.help = "Execute commands with modified context (Minecraft-style)",
+		.info = "Execute commands as different entities or from different positions. Usage: /execute <subcommand> ... run <command>. Subcommands: as <entity>, at <entity>, positioned <x> <y> <z>",
+		.aliases = { "execute", "exec" },
+		.handle = DEVGMCommands::Execute,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	};
+	RegisterCommand(ExecuteCommand);
+
 	// Register Greater Than Zero Commands
 
 	Command KickCommand{
@@ -893,10 +912,10 @@ void SlashCommandHandler::Startup() {
 
 	Command GmInvisCommand{
 		.help = "Toggles invisibility for the character",
-		.info = "Toggles invisibility for the character, though it's currently a bit buggy. Requires nonzero GM Level for the character, but the account must have a GM level of 8",
+		.info = "Toggles invisibility for the character, making them invisible to other players and lower GM levels",
 		.aliases = { "gminvis" },
 		.handle = GMGreaterThanZeroCommands::GmInvis,
-		.requiredLevel = eGameMasterLevel::DEVELOPER
+		.requiredLevel = eGameMasterLevel::FORUM_MODERATOR
 	};
 	RegisterCommand(GmInvisCommand);
 
@@ -1052,7 +1071,7 @@ void SlashCommandHandler::Startup() {
 		.info = "Resurrects the player",
 		.aliases = { "resurrect" },
 		.handle = GMZeroCommands::Resurrect,
-		.requiredLevel = eGameMasterLevel::CIVILIAN
+		.requiredLevel = eGameMasterLevel::DEVELOPER
 	};
 	RegisterCommand(ResurrectCommand);
 
@@ -1468,6 +1487,14 @@ void SlashCommandHandler::Startup() {
 		.info = "Turns all players' pvp mode on",
 		.aliases = {"barfight"},
 		.handle = DEVGMCommands::Barfight,
+		.requiredLevel = eGameMasterLevel::DEVELOPER
+	});
+
+	RegisterCommand({
+		.help = "Despawns an object by id",
+		.info = "Despawns an object by id",
+		.aliases = {"despawn"},
+		.handle = DEVGMCommands::Despawn,
 		.requiredLevel = eGameMasterLevel::DEVELOPER
 	});
 }

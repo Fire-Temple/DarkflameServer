@@ -14,12 +14,10 @@
 Entity* SpinnerWaves::caster1 = nullptr;
 
 void SpinnerWaves::OnStartup(Entity* self) {
-
 	self->SetNetworkVar(u"bIsInUse", true);
 	self->SetVar(u"bActive", false);
 	
 	self->SetProximityRadius(3.5, "spin_distance");
-
 }
 
 void SpinnerWaves::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1,
@@ -49,7 +47,8 @@ void SpinnerWaves::OnSkillEventFired(Entity* self, Entity* caster, const std::st
 void SpinnerWaves::TriggerDrill(Entity* self) {
 	
 //	Move spinner	
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1, 1, eMovementPlatformState::Moving);
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	movingPlatformComponent->GotoWaypoint(1);
 
 //	Play anim	
 	RenderComponent::PlayAnimation(self, u"up");
@@ -83,14 +82,14 @@ void SpinnerWaves::OnTimerDone(Entity* self, std::string timerName) {
 		info.rot = rot;
 
 
-		const auto dir = rot.GetRightVector();
+		const auto dir = QuatUtils::Right(rot);
 		pos.x = pos.x;
 		pos.y = pos.y - 0.1;
 		pos.z = pos.z;
 		info.pos = pos;
 
 
-		info.rot = NiQuaternion::LookAt(info.pos, self->GetPosition());
+		info.rot = QuatUtils::LookAt(info.pos, self->GetPosition());
 		auto* entity = Game::entityManager->CreateEntity(info);
 		Game::entityManager->ConstructEntity(entity);
 	}	

@@ -10,9 +10,11 @@
 #include "InventoryComponent.h"
 #include "Item.h"
 #include "MissionComponent.h"
+#include "User.h"
 #include "SwitchComponent.h"
 #include "DestroyableComponent.h"
 #include "dpWorld.h"
+#include "UserManager.h"
 #include "PetDigServer.h"
 #include "ObjectIDManager.h"
 #include "eUnequippableActiveType.h"
@@ -21,6 +23,7 @@
 #include "eUseItemResponse.h"
 #include "ePlayerFlag.h"
 
+#include "GeneralUtils.h"
 #include "Game.h"
 #include "dConfig.h"
 #include "dChatFilter.h"
@@ -43,9 +46,8 @@ std::unordered_map<LWOOBJID, LWOOBJID> PetComponent::activePets{};
  * while the faction ones could be checked using their respective missions.
  */
 
-PetComponent::PetComponent(Entity* parentEntity, uint32_t componentId) : Component{ parentEntity } {
-	m_PetInfo = CDClientManager::GetTable<CDPetComponentTable>()->GetByID(componentId); // TODO: Make reference when safe
-	m_ComponentId = componentId;
+PetComponent::PetComponent(Entity* parentEntity, const int32_t componentID) : Component{ parentEntity, componentID } {
+	m_PetInfo = CDClientManager::GetTable<CDPetComponentTable>()->GetByID(componentID); // TODO: Make reference when safe
 
 	m_Interaction = LWOOBJID_EMPTY;
 	m_Owner = LWOOBJID_EMPTY;
@@ -168,7 +170,7 @@ void PetComponent::OnUse(Entity* originator) {
 
 	const auto originatorPosition = originator->GetPosition();
 
-	m_Parent->SetRotation(NiQuaternion::LookAt(petPosition, originatorPosition));
+	m_Parent->SetRotation(QuatUtils::LookAt(petPosition, originatorPosition));
 
 	float interactionDistance = m_Parent->GetVar<float>(u"interaction_distance");
 	if (interactionDistance <= 0) {
@@ -177,7 +179,7 @@ void PetComponent::OnUse(Entity* originator) {
 
 	auto position = originatorPosition;
 
-	NiPoint3 forward = NiQuaternion::LookAt(m_Parent->GetPosition(), originator->GetPosition()).GetForwardVector();
+	NiPoint3 forward = QuatUtils::Forward(QuatUtils::LookAt(m_Parent->GetPosition(), originator->GetPosition()));
 	forward.y = 0;
 
 	if (dpWorld::IsLoaded()) {
@@ -186,7 +188,7 @@ void PetComponent::OnUse(Entity* originator) {
 		NiPoint3 nearestPoint = dpWorld::GetNavMesh()->NearestPoint(attempt);
 
 		while (std::abs(nearestPoint.y - petPosition.y) > 4 && interactionDistance > 10) {
-			const NiPoint3 forward = m_Parent->GetRotation().GetForwardVector();
+			const NiPoint3 forward = QuatUtils::Forward(m_Parent->GetRotation());
 
 			attempt = originatorPosition + forward * interactionDistance;
 
@@ -200,7 +202,7 @@ void PetComponent::OnUse(Entity* originator) {
 		position = petPosition + forward * interactionDistance;
 	}
 
-	auto rotation = NiQuaternion::LookAt(position, petPosition);
+	auto rotation = QuatUtils::LookAt(position, petPosition);
 
 	GameMessages::SendNotifyPetTamingMinigame(
 		originator->GetObjectID(),
@@ -460,7 +462,7 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 	EntityInfo info{};
 	info.lot = entry->puzzleModelLot;
 	info.pos = position;
-	info.rot = NiQuaternionConstant::IDENTITY;
+	info.rot = QuatUtils::IDENTITY;
 	info.spawnerID = tamer->GetObjectID();
 
 	auto* modelEntity = Game::entityManager->CreateEntity(info);
@@ -479,10 +481,19 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 		return;
 	}
 
-	LWOOBJID petSubKey = ObjectIDManager::GenerateRandomObjectID();
+	LWOOBJID petSubKey = ObjectIDManager::GetPersistentID();
+	const uint32_t maxTries = 100;
+	uint32_t tries = 0;
+	while (Database::Get()->GetPetNameInfo(petSubKey) && tries < maxTries) {
+		tries++;
+		LOG("Found a duplicate pet %llu, getting a new subKey", petSubKey);
+		petSubKey = ObjectIDManager::GetPersistentID();
+	}
 
-	GeneralUtils::SetBit(petSubKey, eObjectBits::CHARACTER);
-	GeneralUtils::SetBit(petSubKey, eObjectBits::PERSISTENT);
+	if (tries >= maxTries) {
+		LOG("Failed to get a unique pet subKey after %i tries, aborting pet creation for player %i", maxTries, tamer->GetCharacter() ? tamer->GetCharacter()->GetID() : -1);
+		return;
+	}
 
 	m_DatabaseId = petSubKey;
 
@@ -522,13 +533,13 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 		ePetTamingNotifyType::NAMINGPET,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
 	// Triggers the catch a pet missions
 	constexpr auto PET_FLAG_BASE = 800;
-	tamer->GetCharacter()->SetPlayerFlag(PET_FLAG_BASE + m_ComponentId, true);
+	tamer->GetCharacter()->SetPlayerFlag(PET_FLAG_BASE + m_ComponentID, true);
 
 	auto* missionComponent = tamer->GetComponent<MissionComponent>();
 
@@ -545,18 +556,29 @@ void PetComponent::NotifyTamingBuildSuccess(NiPoint3 position) {
 }
 
 void PetComponent::RequestSetPetName(std::u16string name) {
+	const bool autoRejectNames = UserManager::Instance()->GetMuteAutoRejectNames();
+
 	if (m_Tamer == LWOOBJID_EMPTY) {
 		if (m_Owner != LWOOBJID_EMPTY) {
 			auto* owner = GetOwner();
 
-			m_ModerationStatus = 1; // Pending
-			m_Name = "";
+			// If auto reject names is on, and the user is muted, force use of predefined name
+			if (autoRejectNames && owner && owner->GetCharacter() && owner->GetCharacter()->GetParentUser()->GetIsMuted()) {
+				m_ModerationStatus = 2; // Approved
+				std::string forcedName = "Pet";
+				Database::Get()->SetPetNameModerationStatus(m_DatabaseId, IPetNames::Info{ forcedName, static_cast<int32_t>(m_ModerationStatus) });
+				GameMessages::SendSetPetName(m_Owner, GeneralUtils::UTF8ToUTF16(m_Name), m_DatabaseId, owner->GetSystemAddress());
+				GameMessages::SendSetPetNameModerated(m_Owner, m_DatabaseId, m_ModerationStatus, owner->GetSystemAddress());
+			} else {
+				m_ModerationStatus = 1; // Pending
+				m_Name = "";
 
-			//Save our pet's new name to the db:
-			SetPetNameForModeration(GeneralUtils::UTF16ToWTF8(name));
+				//Save our pet's new name to the db:
+				SetPetNameForModeration(GeneralUtils::UTF16ToWTF8(name));
 
-			GameMessages::SendSetPetName(m_Owner, GeneralUtils::UTF8ToUTF16(m_Name), m_DatabaseId, owner->GetSystemAddress());
-			GameMessages::SendSetPetNameModerated(m_Owner, m_DatabaseId, m_ModerationStatus, owner->GetSystemAddress());
+				GameMessages::SendSetPetName(m_Owner, GeneralUtils::UTF8ToUTF16(m_Name), m_DatabaseId, owner->GetSystemAddress());
+				GameMessages::SendSetPetNameModerated(m_Owner, m_DatabaseId, m_ModerationStatus, owner->GetSystemAddress());
+			}
 		}
 
 		return;
@@ -578,11 +600,21 @@ void PetComponent::RequestSetPetName(std::u16string name) {
 		return;
 	}
 
-	m_ModerationStatus = 1; // Pending
-	m_Name = "";
+	// If auto reject names is on, and the user is muted, force use of predefined name ELSE proceed with normal name check
+	if (autoRejectNames && tamer->GetCharacter() && tamer->GetCharacter()->GetParentUser()->GetIsMuted()) {
+		m_ModerationStatus = 2; // Approved
+		m_Name = "";
+		std::string forcedName = "Pet";
 
-	//Save our pet's new name to the db:
-	SetPetNameForModeration(GeneralUtils::UTF16ToWTF8(name));
+		Database::Get()->SetPetNameModerationStatus(m_DatabaseId, IPetNames::Info{ forcedName, static_cast<int32_t>(m_ModerationStatus) });
+		LOG("AccountID: %i is muted, forcing use of predefined pet name", tamer->GetCharacter()->GetParentUser()->GetAccountID());
+	} else {
+		m_ModerationStatus = 1; // Pending
+		m_Name = "";
+
+		//Save our pet's new name to the db:
+		SetPetNameForModeration(GeneralUtils::UTF16ToWTF8(name));
+	}
 
 	Game::entityManager->SerializeEntity(m_Parent);
 
@@ -601,7 +633,7 @@ void PetComponent::RequestSetPetName(std::u16string name) {
 		ePetTamingNotifyType::SUCCESS,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -645,7 +677,7 @@ void PetComponent::ClientExitTamingMinigame(bool voluntaryExit) {
 		ePetTamingNotifyType::QUIT,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -696,7 +728,7 @@ void PetComponent::ClientFailTamingMinigame() {
 		ePetTamingNotifyType::FAILED,
 		NiPoint3Constant::ZERO,
 		NiPoint3Constant::ZERO,
-		NiQuaternionConstant::IDENTITY,
+		QuatUtils::IDENTITY,
 		UNASSIGNED_SYSTEM_ADDRESS
 	);
 
@@ -890,7 +922,9 @@ void PetComponent::Deactivate() {
 }
 
 void PetComponent::Release() {
-	auto* inventoryComponent = GetOwner()->GetComponent<InventoryComponent>();
+	auto* const owner = GetOwner();
+	if (!owner) return;
+	auto* const inventoryComponent = owner->GetComponent<InventoryComponent>();
 
 	if (inventoryComponent == nullptr) {
 		return;
@@ -900,9 +934,9 @@ void PetComponent::Release() {
 
 	inventoryComponent->RemoveDatabasePet(m_DatabaseId);
 
-	auto* item = inventoryComponent->FindItemBySubKey(m_DatabaseId);
+	auto* const item = inventoryComponent->FindItemBySubKey(m_DatabaseId);
 
-	item->SetCount(0, false, false);
+	if (item) item->SetCount(0, false, false);
 }
 
 void PetComponent::Command(const NiPoint3& position, const LWOOBJID source, const int32_t commandType, const int32_t typeId, const bool overrideObey) {

@@ -9,7 +9,7 @@ public:
 	void OnFireEventServerSide(Entity* self, Entity* sender, std::string args, int32_t param1, int32_t param2,
 		int32_t param3) override;
 
-	void SpawnLegs(Entity* self, const std::string& loc);
+	void SpawnBeetles(Entity* self, const std::string& loc);
 
 	void OnChildLoaded(Entity* self, Entity* child);
 
@@ -17,10 +17,10 @@ public:
 
 private:
 
-	int AIsActivated;
-	int BIsActivated;
-	int CIsActivated;
-	int DIsActivated;
+	bool AIsActivated = false;
+	bool BIsActivated = false;
+	bool CIsActivated = false;
+	bool DIsActivated = false;
 
     static Entity* statue;
 };

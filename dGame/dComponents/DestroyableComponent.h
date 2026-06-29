@@ -9,6 +9,12 @@
 #include "eReplicaComponentType.h"
 #include "Implementation.h"
 
+namespace GameMessages {
+	struct GetObjectReportInfo;
+	struct SetFaction;
+	struct IsDead;
+};
+
 namespace CppScripts {
 	class Script;
 }; //! namespace CppScripts
@@ -22,7 +28,7 @@ class DestroyableComponent final : public Component {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::DESTROYABLE;
 
-	DestroyableComponent(Entity* parentEntity);
+	DestroyableComponent(Entity* parentEntity, const int32_t componentID);
 	~DestroyableComponent() override;
 
 	void Update(float deltaTime) override;
@@ -366,6 +372,8 @@ public:
 	 */
 	uint32_t GetLootMatrixID() const { return m_LootMatrixID; }
 
+	void SetCurrencyIndex(int32_t currencyIndex) { m_CurrencyIndex = currencyIndex; }
+
 	/**
 	 * Returns the ID of the entity that killed this entity, if any
 	 * @return the ID of the entity that killed this entity, if any
@@ -463,6 +471,12 @@ public:
 
 	// handle hardcode mode drops
 	void DoHardcoreModeDrops(const LWOOBJID source);
+
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
+	bool OnSetFaction(GameMessages::SetFaction& setFaction);
+	bool OnIsDead(GameMessages::IsDead& isDead);
+
+	void SetIsDead(const bool value) { m_IsDead = value; }
 
 	static Implementation<bool, const Entity*> IsEnemyImplentation;
 	static Implementation<bool, const Entity*> IsFriendImplentation;
@@ -578,6 +592,9 @@ private:
 	 */
 	uint32_t m_LootMatrixID;
 
+	// The currency index to determine how much loot to drop
+	int32_t m_CurrencyIndex{ -1 };
+
 	/**
 	 * The min amount of coins that will drop when this entity is smashed
 	 */
@@ -591,7 +608,7 @@ private:
 	/**
 	 * The ID of the entity that smashed this entity, if any
 	 */
-	LWOOBJID m_KillerID;
+	LWOOBJID m_KillerID{};
 
 	/**
 	 * The list of callbacks that will be called when this entity gets hit

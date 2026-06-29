@@ -18,7 +18,7 @@ void SQLiteDatabase::InsertNewMail(const MailInfo& mail) {
 		mail.itemCount);
 }
 
-std::vector<MailInfo> SQLiteDatabase::GetMailForPlayer(const uint32_t characterId, const uint32_t numberOfMail) {
+std::vector<MailInfo> SQLiteDatabase::GetMailForPlayer(const LWOOBJID characterId, const uint32_t numberOfMail) {
 	auto [_, res] = ExecuteSelect(
 		"SELECT id, subject, body, sender_name, attachment_id, attachment_lot, attachment_subkey, attachment_count, was_read, time_sent"
 		" FROM mail WHERE receiver_id=? limit ?;",
@@ -47,7 +47,7 @@ std::vector<MailInfo> SQLiteDatabase::GetMailForPlayer(const uint32_t characterI
 }
 
 std::optional<MailInfo> SQLiteDatabase::GetMail(const uint64_t mailId) {
-	auto [_, res] = ExecuteSelect("SELECT attachment_lot, attachment_count FROM mail WHERE id=? LIMIT 1;", mailId);
+	auto [_, res] = ExecuteSelect("SELECT attachment_lot, attachment_count, receiver_id FROM mail WHERE id=? LIMIT 1;", mailId);
 
 	if (res.eof()) {
 		return std::nullopt;
@@ -56,11 +56,12 @@ std::optional<MailInfo> SQLiteDatabase::GetMail(const uint64_t mailId) {
 	MailInfo toReturn;
 	toReturn.itemLOT = res.getIntField("attachment_lot");
 	toReturn.itemCount = res.getIntField("attachment_count");
+	toReturn.receiverId = res.getInt64Field("receiver_id");
 
 	return toReturn;
 }
 
-uint32_t SQLiteDatabase::GetUnreadMailCount(const uint32_t characterId) {
+uint32_t SQLiteDatabase::GetUnreadMailCount(const LWOOBJID characterId) {
 	auto [_, res] = ExecuteSelect("SELECT COUNT(*) AS number_unread FROM mail WHERE receiver_id=? AND was_read=0;", characterId);
 
 	if (res.eof()) {

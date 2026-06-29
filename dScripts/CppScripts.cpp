@@ -350,6 +350,8 @@
 #include "ImaginationBackPack.h"
 #include "NsWinterRaceServer.h"
 
+#include "RegisterWithZoneControl.h"
+
 #include <map>
 #include <string>
 #include <functional>
@@ -410,7 +412,6 @@
 #include "MillstoneEvent.h"
 #include "Button70.h"
 #include "SpawnerSpinner71.h"
-#include "FtMillstoneCinematic.h"
 #include "FtLowBlades.h"
 #include "SpinnerWaves.h"
 
@@ -423,6 +424,8 @@
 #include "OnyxShardPack.h"
 
 //Njhub misc
+#include "NjEarthPillars.h"
+#include "NjLightningOrb.h"
 #include "NjFireRocks.h"
 #include "NjFireRocksManager.h"
 #include "SimpleMoverSwitch.h"
@@ -724,10 +727,12 @@ namespace {
 		{"scripts\\02_server\\Map\\njhub\\L_EARTH_PET_SERVER.lua", []() {return new NjEarthPetServer();}},
 		{"scripts\\02_server\\Map\\njhub\\L_DRAGON_EMBLEM_CHEST_SERVER.lua", []() {return new NjDragonEmblemChestServer();}},
 		{"scripts\\02_server\\Map\\njhub\\L_NYA_MISSION_ITEMS.lua", []() {return new NjNyaMissionitems();}},
+		{"scripts\\02_server\\Map\\njhub\\L_EARTH_TRANS_PILLARS.lua", []() {return new NjEarthPillars();}},
+		{"scripts\\02_server\\Map\\njhub\\L_LIGHTNING_ORB_SERVER.lua", []() {return new NjLightningOrb();}},		
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS.lua", []() {return new NjFireRocks();}},
 		{"scripts\\02_server\\Map\\njhub\\L_FIRE_TRANS_ROCKS_MANAGER.lua", []() {return new NjFireRocksManager();}},		
 		{"scripts\\02_server\\Map\\General\\L_SIMPLE_MOVER_SWITCH.lua", []() {return new SimpleMoverSwitch();}},	
-		{"scripts\\02_server\\Map\\njhub\\L_OLD_MAN_NPC.lua", []() {return new NjOldManNPC();}},	
+		{"scripts\\02_server\\Map\\njhub\\L_OLD_MAN_NPC.lua", []() {return new OldManNPC();}},	
 
 
 		//DLU
@@ -766,6 +771,7 @@ namespace {
 
 		//WBL
 		{"scripts\\zone\\LUPs\\WBL_generic_zone.lua", []() {return new WblGenericZone();}},
+		{"scripts\\zone\\LUPs\\Moonbase Intro\\MOONBASE-INTRO_INTRO_CINEMATIC.lua", []() {return new WblGenericZone();}},
 
 		//Alpha
 		{"scripts\\ai\\FV\\L_TRIGGER_GAS.lua", []() {return new TriggerGas();}},
@@ -811,6 +817,8 @@ namespace {
 		{"scripts\\ai\\RACING\\OBJECTS\\VEHICLE_DEATH_TRIGGER_WATER_SERVER.lua", []() {return new VehicleDeathTriggerWaterServer();}},
 		{"scripts\\equipmenttriggers\\L_TRIAL_FACTION_ARMOR_SERVER.lua", []() {return new TrialFactionArmorServer();}},
 		{"scripts\\equipmenttriggers\\ImaginationBackPack.lua", []() {return new ImaginationBackPack();}},
+		{"scripts\\ai\\MINIGAME\\SG_GF\\SERVER\\SG_CANNON_INSTANCE_ACTOR.lua", [](){return new RegisterWithZoneControl();}},
+		{"scripts\\ai\\MINIGAME\\SG_GF\\SERVER\\SG_CANNON_INSTANCE_EFFECT.lua", [](){return new RegisterWithZoneControl();}},
 
 		// ZP
 		{"scripts\\ai\\YRK\\L_BALLOONTRIGGER.lua", []() {return new BalloonTrigger();}},
@@ -878,13 +886,12 @@ namespace {
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_MILLSTONE_EVENT.lua", []() { return new MillstoneEvent(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BUTTON70.lua", []() { return new Button70(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_SPAWNER_SPINNER71.lua", []() { return new SpawnerSpinner71(); } },
-		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_MILLSTONE_CINEMATIC.lua", []() { return new FtMillstoneCinematic(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_LOWBLADES.lua", []() { return new FtLowBlades(); } },
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_ELEVATORSPINNER_WAVES.lua", []() { return new SpinnerWaves(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_GARMADON_TORNADO.lua", []() { return new FtGarmadonTornado(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_MANAGER_SERVER.lua", []() { return new FtBossManager(); } },		
 		{ "scripts\\02_server\\Map\\njhub\\boss_instance\\L_BOSS_ACTIVATORS_SERVER.lua", []() { return new FtBossActivators(); } },	
-		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_NINJAGO_PROPERTY.lua", []() { return new NjPropertyServer(); } },	
+		{ "scripts\\zone\\PROPERTY\\NJ\\L_ZONE_NINJAGO_PROPERTY.lua", []() { return new NjPropertyServer(); } }
 
 	};
 
@@ -916,6 +923,10 @@ namespace {
 		"scripts\\zone\\LUPs\\RobotCity Intro\\WBL_RCIntro_InfectedCitizen.lua",
 		"scripts\\ai\\MINIGAME\\SIEGE\\OBJECTS\\ATTACKER_BOUNCER_SERVER.lua",
 		"scripts\\ai\\AG\\L_AG_ZONE_PLAYER.lua",
+		"scripts\\ai\\GENERAL\\L_NPC_GENERIC_MOVEMENT.lua", // Really old alpha script
+		"scripts\\zone\\LUPs\\DeepFreeze Intro\\WBL_Enemy_Beaver.lua", // Really old alpha script
+		"scripts\\ai\\GENERAL\\L_NPC_GENERIC_WANDER_SMALL.lua", // Really old alpha script
+		"scripts\\ai\\NP\\L_NPC_NP_OLD_MAN_SHERLAND.lua" // used in pre-release crux
 	};
 };
 
@@ -929,7 +940,8 @@ CppScripts::Script* const CppScripts::GetScript(Entity* parent, const std::strin
 	Script* script = itrTernary != scriptLoader.cend() ? itrTernary->second() : &InvalidToReturn;
 
 	if (script == &InvalidToReturn && !scriptName.empty() && !g_ExcludedScripts.contains(scriptName)) {
-		LOG_DEBUG("LOT %i attempted to load CppScript for '%s', but returned InvalidScript.", parent->GetLOT(), scriptName.c_str());
+		const auto [x, y, z] = parent->GetPosition();
+		LOG_DEBUG("LOT %i at %f %f %f attempted to load CppScript for '%s', but returned InvalidScript.", parent->GetLOT(), x, y, z, scriptName.c_str());
 	}
 
 	g_Scripts[scriptName] = script;

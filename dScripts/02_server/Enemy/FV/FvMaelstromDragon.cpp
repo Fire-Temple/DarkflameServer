@@ -92,7 +92,7 @@ void FvMaelstromDragon::OnHitOrHealResult(Entity* self, Entity* attacker, int32_
 			self->AddTimer("timeToStunLoop", 1.0f);
 
 			auto position = self->GetPosition();
-			auto forward = self->GetRotation().GetForwardVector();
+			auto forward = QuatUtils::Forward(self->GetRotation());
 			auto backwards = forward * -1;
 
 			forward.x *= 10;
@@ -113,17 +113,14 @@ void FvMaelstromDragon::OnHitOrHealResult(Entity* self, Entity* attacker, int32_
 			info.pos = objectPosition;
 			info.rot = rotation;
 			info.spawnerID = self->GetObjectID();
-			info.settings = {
-					new LDFData<std::string>(u"rebuild_activators",
+			info.settings.Insert<std::string>(u"rebuild_activators",
 						std::to_string(objectPosition.x + forward.x) + "\x1f" +
 						std::to_string(objectPosition.y) + "\x1f" +
-						std::to_string(objectPosition.z + forward.z)
-					),
-					new LDFData<int32_t>(u"respawn", 100000),
-					new LDFData<float>(u"rebuild_reset_time", 15),
-					new LDFData<bool>(u"no_timed_spawn", true),
-					new LDFData<LWOOBJID>(u"Dragon", self->GetObjectID())
-			};
+						std::to_string(objectPosition.z + forward.z));
+			info.settings.Insert<int32_t>(u"respawn", 100000);
+			info.settings.Insert<float>(u"rebuild_reset_time", 15);
+			info.settings.Insert<bool>(u"no_timed_spawn", true);
+			info.settings.Insert<LWOOBJID>(u"Dragon", self->GetObjectID());
 
 			auto* golemObject = Game::entityManager->CreateEntity(info);
 

@@ -9,7 +9,7 @@
 #include "CDZoneTableTable.h"
 #include "MasterPackets.h"
 #include "BitStreamUtils.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Master.h"
 
 #include "Start.h"
@@ -172,7 +172,7 @@ void InstanceManager::RequestAffirmation(const InstancePtr& instance, const Pend
 
 	CBITSTREAM;
 
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::AFFIRM_TRANSFER_REQUEST);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::AFFIRM_TRANSFER_REQUEST);
 
 	bitStream.Write(request.id);
 
@@ -308,7 +308,7 @@ const InstancePtr& InstanceManager::FindPrivateInstance(const std::string& passw
 			continue;
 		}
 
-		LOG("Password: %s == %s => %d", password.c_str(), instance->GetPassword().c_str(), password == instance->GetPassword());
+		LOG("Checking private zone password match (result: %d)", password == instance->GetPassword());
 
 		if (instance->GetPassword() == password) {
 			return instance;
@@ -332,6 +332,12 @@ int InstanceManager::GetHardCap(LWOMAPID mapID) {
 	return zone ? zone->population_hard_cap : 12;
 }
 
+void InstanceManager::PruneUnreadyInstances() {
+	for (int i = static_cast<int>(m_Instances.size()) - 1; i >= 0; i--) {
+		if (!m_Instances[i]->GetIsReady()) m_Instances.erase(m_Instances.cbegin() + i);
+	}
+}
+
 void Instance::SetShutdownComplete(const bool value) {
 	m_Shutdown = value;
 }
@@ -343,7 +349,7 @@ bool Instance::GetShutdownComplete() const {
 void Instance::Shutdown() {
 	CBITSTREAM;
 
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SHUTDOWN);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SHUTDOWN);
 
 	Game::server->Send(bitStream, this->m_SysAddr, false);
 
@@ -359,4 +365,3 @@ bool Instance::IsFull(bool isFriendTransfer) const {
 
 	return true;
 }
-

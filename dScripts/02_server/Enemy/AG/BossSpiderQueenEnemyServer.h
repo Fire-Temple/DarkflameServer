@@ -46,13 +46,16 @@ public:
 
 	void OnTimerDone(Entity* self, std::string timerName) override;
 
+	void OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status);
+
 private:
+	void ToggleAttacking(Entity& self, bool on);
 	//Regular variables:
 	DestroyableComponent* destroyable = nullptr;
 	ControllablePhysicsComponent* controllable = nullptr;
 	BaseCombatAIComponent* combat = nullptr;
 
-	NiQuaternion originRotation;
+	NiQuaternion originRotation = QuatUtils::IDENTITY;
 
 	int m_CurrentBossStage = 0;
 	int m_DeathCounter = 0;

@@ -25,8 +25,9 @@
 #include "MessageType/Game.h"
 #include "ePlayerFlag.h"
 #include <ctime>
+#include <ranges>
 
-CharacterComponent::CharacterComponent(Entity* parent, Character* character, const SystemAddress& systemAddress) : Component(parent) {
+CharacterComponent::CharacterComponent(Entity* parent, const int32_t componentID, Character* character, const SystemAddress& systemAddress) : Component(parent, componentID) {
 	m_Character = character;
 
 	m_IsRacing = false;
@@ -50,19 +51,12 @@ CharacterComponent::CharacterComponent(Entity* parent, Character* character, con
 	m_LastUpdateTimestamp = std::time(nullptr);
 	m_SystemAddress = systemAddress;
 
-	RegisterMsg(MessageType::Game::REQUEST_SERVER_OBJECT_INFO, this, &CharacterComponent::OnRequestServerObjectInfo);
+	RegisterMsg(&CharacterComponent::OnGetObjectReportInfo);
 }
 
-bool CharacterComponent::OnRequestServerObjectInfo(GameMessages::GameMsg& msg) {
-	auto& request = static_cast<GameMessages::RequestServerObjectInfo&>(msg);
-	AMFArrayValue response;
+bool CharacterComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
 
-	response.Insert("visible", true);
-	response.Insert("objectID", std::to_string(request.targetForReport));
-	response.Insert("serverInfo", true);
-
-	auto& data = *response.InsertArray("data");
-	auto& cmptType = data.PushDebug("Character");
+	auto& cmptType = reportInfo.info->PushDebug("Character");
 
 	cmptType.PushDebug<AMFIntValue>("Component ID") = GeneralUtils::ToUnderlying(ComponentType);
 	cmptType.PushDebug<AMFIntValue>("Character's account ID") = m_Character->GetParentUser()->GetAccountID();
@@ -73,6 +67,13 @@ bool CharacterComponent::OnRequestServerObjectInfo(GameMessages::GameMsg& msg) {
 	cmptType.PushDebug<AMFStringValue>("Total currency") = std::to_string(m_Character->GetCoins());
 	cmptType.PushDebug<AMFStringValue>("Currency able to be picked up") = std::to_string(m_DroppedCoins);
 	cmptType.PushDebug<AMFStringValue>("Tooltip flags value") = "0";
+	auto& vl = cmptType.PushDebug("Visited Levels");
+	for (const auto zoneID : m_VisitedLevels) {
+		std::stringstream sstream;
+		sstream << "MapID: " << zoneID.GetMapID() << " CloneID: " << zoneID.GetCloneID();
+		vl.PushDebug(sstream.str());
+	}
+
 	// visited locations
 	cmptType.PushDebug<AMFBoolValue>("is a GM") = m_GMLevel > eGameMasterLevel::CIVILIAN;
 	cmptType.PushDebug<AMFBoolValue>("Has PVP flag turned on") = m_PvpEnabled;
@@ -84,9 +85,30 @@ bool CharacterComponent::OnRequestServerObjectInfo(GameMessages::GameMsg& msg) {
 	cmptType.PushDebug<AMFIntValue>("Current Activity Type") = GeneralUtils::ToUnderlying(m_CurrentActivity);
 	cmptType.PushDebug<AMFDoubleValue>("Property Clone ID") = m_Character->GetPropertyCloneID();
 
-	GameMessages::SendUIMessageServerToSingleClient("ToggleObjectDebugger", response, m_Parent->GetSystemAddress());
+	auto& flagCmptType = reportInfo.info->PushDebug("Player Flag");
+	auto& allFlags = flagCmptType.PushDebug("All flags");
 
-	LOG("Handled!");
+	for (const auto& [id, flagChunk] : m_Character->GetPlayerFlags()) {
+		const auto base = id * 64;
+		auto flagChunkCopy = flagChunk;
+		for (int i = 0; i < 64; i++) {
+			if (static_cast<bool>(flagChunkCopy & 1)) {
+				const int32_t flagId = base + i;
+				std::stringstream stream;
+				stream << "Flag: " << flagId;
+				allFlags.PushDebug(stream.str());
+			}
+			flagChunkCopy >>= 1;
+		}
+	}
+
+	auto& sessionFlags = flagCmptType.PushDebug("Session Only Flags");
+	for (const auto flagId : m_Character->GetSessionFlags()) {
+		std::stringstream stream;
+		stream << "Flag: " << flagId;
+		sessionFlags.PushDebug(stream.str());
+	}
+
 	return true;
 }
 
@@ -485,7 +507,7 @@ Item* CharacterComponent::RocketEquip(Entity* player) {
 	if (!rocket) return rocket;
 
 	// build and define the rocket config
-	for (LDFBaseData* data : rocket->GetConfig()) {
+	for (const auto& data : rocket->GetConfig().values | std::views::values) {
 		if (data->GetKey() == u"assemblyPartLOTs") {
 			std::string newRocketStr = data->GetValueAsString() + ";";
 			GeneralUtils::ReplaceInString(newRocketStr, "+", ";");
@@ -508,12 +530,12 @@ void CharacterComponent::RocketUnEquip(Entity* player) {
 }
 
 void CharacterComponent::TrackMissionCompletion(bool isAchievement) {
-	UpdatePlayerStatistic(MissionsCompleted);
-
 	// Achievements are tracked separately for the zone
 	if (isAchievement) {
 		const auto mapID = Game::zoneManager->GetZoneID().GetMapID();
 		GetZoneStatisticsForMap(mapID).m_AchievementsCollected++;
+	} else {
+		UpdatePlayerStatistic(MissionsCompleted);
 	}
 }
 
@@ -791,8 +813,14 @@ std::string CharacterComponent::StatisticsToString() const {
 	return result.str();
 }
 
-uint64_t CharacterComponent::GetStatisticFromSplit(std::vector<std::string> split, uint32_t index) {
-	return split.size() > index ? std::stoull(split.at(index)) : 0;
+uint64_t CharacterComponent::GetStatisticFromSplit(const std::vector<std::string>& split, const uint32_t index) {
+	uint64_t toReturn = 0;
+	if (index < split.size()) {
+		const auto parsed = GeneralUtils::TryParse<uint64_t>(split[index]);
+		if (parsed) toReturn = *parsed;
+	}
+	
+	return toReturn;
 }
 
 ZoneStatistics& CharacterComponent::GetZoneStatisticsForMap(LWOMAPID mapID) {
@@ -876,7 +904,7 @@ void CharacterComponent::SendToZone(LWOMAPID zoneId, LWOCLONEID cloneId) const {
 			character->SetZoneID(zoneID);
 			character->SetZoneInstance(zoneInstance);
 			character->SetZoneClone(zoneClone);
-			
+
 			characterComponent->SetLastRocketConfig(u"");
 			characterComponent->AddVisitedLevel(LWOZONEID(zoneID, LWOINSTANCEID_INVALID, zoneClone));
 

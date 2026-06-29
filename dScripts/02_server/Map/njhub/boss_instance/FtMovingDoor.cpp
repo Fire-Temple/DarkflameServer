@@ -9,23 +9,26 @@
 #include "eStateChangeType.h"
 
 void FtMovingDoor::OnStartup(Entity* self) {
-	self->SetVar<int>(u"SpinnerProgress", 0);	
+	self->SetVar<int>(u"SpinnerProgress", 0);
 }
 
 void FtMovingDoor::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1,
 	int32_t param2) {
-	const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
-	auto Progress = self->GetVar<int>(u"SpinnerProgress");
+	const auto attachedPath = self->GetVar<std::u16string>(u"attached_path");
+	auto progress = self->GetVar<int>(u"SpinnerProgress");
 	
-	if (name == "SpinnerDeactivated") {	
-		if (AttachedPath == u"ZSpinner78") {
-			if (Progress == 7) {
+	if (name == "SpinnerDeactivated") {
+		// 8 spinners
+		if (attachedPath == u"ZSpinner78") {
+			if (progress == 7) {
 				self->AddTimer("MoveUp", 5.4f);
-				DoorsProgress(self);
+				DoorsProgress(self);				
 			}
-			self->SetVar<int>(u"SpinnerProgress", Progress + 1);	
+			self->SetVar<int>(u"SpinnerProgress", progress + 1);	
+			
 		} else {
-			GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+			auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();		
+			movingPlatformComponent->GotoWaypoint(1);
 			DoorsProgress(self);
 		}	
 	} else if (name == "WavesSpinnerDeactivated") {		
@@ -36,8 +39,8 @@ void FtMovingDoor::OnNotifyObject(Entity* self, Entity* sender, const std::strin
 
 void FtMovingDoor::DoorsProgress(Entity* self) {
 //	Completion check for boss
-	const auto BossManager = Game::entityManager->GetEntitiesInGroup("BossManager");
-	for (auto* bossobj : BossManager) {
+	const auto bossManager = Game::entityManager->GetEntitiesInGroup("BossManager");
+	for (auto* bossobj : bossManager) {
 		auto DoorValue = bossobj->GetVar<int>(u"DoorsOpen");
 		bossobj->SetVar<int>(u"DoorsOpen", DoorValue + 1);	
 	}	
@@ -45,6 +48,7 @@ void FtMovingDoor::DoorsProgress(Entity* self) {
 
 void FtMovingDoor::OnTimerDone(Entity* self, std::string timerName) {	
 	if (timerName == "MoveUp") {	
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();		
+		movingPlatformComponent->GotoWaypoint(1);
 	}
 }		

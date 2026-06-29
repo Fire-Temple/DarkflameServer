@@ -42,11 +42,6 @@ public:
 
 private:
 
-    static Entity* player1;
-    static Entity* player2;
-    static Entity* player3;
-    static Entity* player4;
-
     static Entity* randomPlayer;
 
 	int randomPlayerNum = 0;
@@ -93,7 +88,7 @@ private:
     int DelayToCounterSpawn = 2;
     std::vector<int> DestroyPortalMissions = { 2094 };
 
-    // Struct for wave enemy loadouts
+// 	Struct for wave enemy loadouts
     struct Wave {
         int LOT;
         int LargeNum;

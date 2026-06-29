@@ -8,7 +8,7 @@
 #include "GeneralUtils.h"
 #include "BitStreamUtils.h"
 #include "Database.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "ChatPackets.h"
 #include "dConfig.h"
 #include "MessageType/Chat.h"
@@ -105,15 +105,7 @@ void PlayerContainer::RemovePlayer(const LWOOBJID playerID) {
 	auto* team = TeamContainer::GetTeam(playerID);
 
 	if (team != nullptr) {
-		const auto memberName = GeneralUtils::UTF8ToUTF16(player.playerName);
-
-		for (const auto memberId : team->memberIDs) {
-			const auto& otherMember = GetPlayerData(memberId);
-
-			if (!otherMember) continue;
-
-			TeamContainer::SendTeamSetOffWorldFlag(otherMember, playerID, { 0, 0, 0 });
-		}
+		TeamContainer::RemoveMember(team, playerID, false, false, true);
 	}
 
 	ChatWeb::SendWSPlayerUpdate(player, eActivityType::PlayerLoggedOut);
@@ -147,7 +139,7 @@ void PlayerContainer::MuteUpdate(Packet* packet) {
 
 void PlayerContainer::BroadcastMuteUpdate(LWOOBJID player, time_t time) {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::GM_MUTE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::GM_MUTE);
 
 	bitStream.Write(player);
 	bitStream.Write(time);
@@ -176,6 +168,7 @@ LWOOBJID PlayerContainer::GetId(const std::u16string& playerName) {
 	return toReturn;
 }
 
+// TODO Make this a pointer again or do something to make it so you cant edit the LWOOBJID_EMPTY entry?  it should be ignored in all cases anyways though...
 PlayerData& PlayerContainer::GetPlayerDataMutable(const LWOOBJID& playerID) {
 	return m_Players.contains(playerID) ? m_Players[playerID] : m_Players[LWOOBJID_EMPTY];
 }

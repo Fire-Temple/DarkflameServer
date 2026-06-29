@@ -6,7 +6,7 @@
 
 #include "RakNetworkFactory.h"
 #include "MessageIdentifiers.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Server.h"
 #include "MessageType/Master.h"
 
@@ -50,7 +50,7 @@ dServer::dServer(
 	Logger* logger,
 	const std::string masterIP,
 	int masterPort,
-	ServerType serverType,
+	ServiceType serverType,
 	dConfig* config,
 	Game::signal_t* lastSignal,
 	const std::string& masterPassword,
@@ -87,7 +87,7 @@ dServer::dServer(
 	} else {
 		LOG("FAILED TO START SERVER ON IP/PORT: %s:%i", ip.c_str(), port);
 #ifdef DARKFLAME_PLATFORM_LINUX
-		if (mServerType == ServerType::Auth) {
+		if (mServerType == ServiceType::AUTH) {
 			const auto cwd = BinaryPathFinder::GetBinaryDir();
 			LOG("Try running the following command before launching again:\n    sudo setcap 'cap_net_bind_service=+ep' \"%s/AuthServer\"", cwd.string().c_str());
 		}
@@ -98,7 +98,7 @@ dServer::dServer(
 	mLogger->SetLogToConsole(prevLogSetting);
 
 	//Connect to master if we are not master:
-	if (serverType != ServerType::Master) {
+	if (serverType != ServiceType::MASTER) {
 		SetupForMasterConnection();
 		if (!ConnectToMaster()) {
 			LOG("Failed ConnectToMaster!");
@@ -106,7 +106,7 @@ dServer::dServer(
 	}
 
 	//Set up Replica if we're a world server:
-	if (serverType == ServerType::World) {
+	if (serverType == ServiceType::WORLD) {
 		mNetIDManager = new NetworkIDManager();
 		mNetIDManager->SetIsNetworkIDAuthority(true);
 
@@ -151,7 +151,7 @@ Packet* dServer::ReceiveFromMaster() {
 			break;
 		}
 		case ID_USER_PACKET_ENUM: {
-			if (static_cast<eConnectionType>(packet->data[1]) == eConnectionType::MASTER) {
+			if (static_cast<ServiceType>(packet->data[1]) == ServiceType::MASTER) {
 				switch (static_cast<MessageType::Master>(packet->data[3])) {
 				case MessageType::Master::REQUEST_ZONE_TRANSFER_RESPONSE: {
 					ZoneInstanceManager::Instance()->HandleRequestZoneTransferResponse(packet);
@@ -199,7 +199,7 @@ void dServer::SendToMaster(RakNet::BitStream& bitStream) {
 
 void dServer::Disconnect(const SystemAddress& sysAddr, eServerDisconnectIdentifiers disconNotifyID) {
 	RakNet::BitStream bitStream;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::SERVER, MessageType::Server::DISCONNECT_NOTIFY);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::COMMON, MessageType::Server::DISCONNECT_NOTIFY);
 	bitStream.Write(disconNotifyID);
 	mPeer->Send(&bitStream, SYSTEM_PRIORITY, RELIABLE_ORDERED, 0, sysAddr, false);
 
@@ -215,6 +215,8 @@ bool dServer::Startup() {
 	mPeer = RakNetworkFactory::GetRakPeerInterface();
 
 	if (!mPeer) return false;
+
+	if (mUseEncryption) mPeer->InitializeSecurity(nullptr, nullptr, nullptr, nullptr);
 	if (!mPeer->Startup(mMaxConnections, 10, &mSocketDescriptor, 1)) return false;
 
 	if (mIsInternal) {
@@ -226,19 +228,16 @@ bool dServer::Startup() {
 	}
 
 	mPeer->SetMaximumIncomingConnections(mMaxConnections);
-	if (mUseEncryption) mPeer->InitializeSecurity(NULL, NULL, NULL, NULL);
 
 	return true;
 }
 
 void dServer::UpdateMaximumMtuSize() {
-	auto maxMtuSize = mConfig->GetValue("maximum_mtu_size");
-	mPeer->SetMTUSize(maxMtuSize.empty() ? 1228 : std::stoi(maxMtuSize));
+	mPeer->SetMTUSize(mConfig->GetValue<int32_t>("maximum_mtu_size", 1228));
 }
 
 void dServer::UpdateBandwidthLimit() {
-	auto newBandwidth = mConfig->GetValue("maximum_outgoing_bandwidth");
-	mPeer->SetPerConnectionOutgoingBandwidthLimit(!newBandwidth.empty() ? std::stoi(newBandwidth) : 0);
+	mPeer->SetPerConnectionOutgoingBandwidthLimit(mConfig->GetValue<int32_t>("maximum_outgoing_bandwidth", 0));
 }
 
 void dServer::Shutdown() {
@@ -257,7 +256,7 @@ void dServer::Shutdown() {
 		mReplicaManager = nullptr;
 	}
 
-	if (mServerType != ServerType::Master && mMasterPeer) {
+	if (mServerType != ServiceType::MASTER && mMasterPeer) {
 		mMasterPeer->Shutdown(1000);
 		RakNetworkFactory::DestroyRakPeerInterface(mMasterPeer);
 	}

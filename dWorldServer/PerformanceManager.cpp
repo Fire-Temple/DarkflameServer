@@ -32,6 +32,7 @@ namespace {
 		{ 1204, BATTLE_INSTANCE },
 		{ 1250, PROPERTY },
 		{ 1251, PROPERTY },
+		{ 1260, SOCIAL },
 
 		// GF
 		{ 1300, BATTLE },

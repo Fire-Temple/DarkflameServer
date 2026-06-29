@@ -12,18 +12,15 @@ public:
 
 	void OnPlayerExit(Entity* self, Entity* player) override;
 
-	void OnTimerDone(Entity* self, std::string timerName) override;
-
 private:
 
-    static Entity* player1;
-    static Entity* player2;
-    static Entity* player3;
-    static Entity* player4;
+	void SetPlayerCounts(Entity* self);
 
 	int PlayerCount;
 
 	int BossPlayerCount;
+	
+	int ChestPlayerCount;
 
 	int TeamChecked;
 

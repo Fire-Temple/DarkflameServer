@@ -22,12 +22,16 @@ void SimpleOnceMover::OnStartup(Entity* self) {
 
 void SimpleOnceMover::OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1,
 	int32_t param2) {
+
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 	const auto AttachedPath = self->GetVar<std::u16string>(u"attached_path");
+	const auto groupID = self->GetVar<std::u16string>(u"groupID");
 	auto ResetTime = sender->GetVar<int32_t>(u"reset_time");	
 	if (name == "SpinnerDeactivated") {		
 		if (self->GetVar<int>(u"ToggleSpinner") == 1) {
 			RenderComponent::PlayAnimation(self, u"up");
-			GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+
+			movingPlatformComponent->GotoWaypoint(1);
 			
 	//		Ascend sfx
 			GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{5c30c263-00ae-42a2-80a3-2ae33c8f13fe}");	
@@ -41,18 +45,20 @@ void SimpleOnceMover::OnNotifyObject(Entity* self, Entity* sender, const std::st
 	
 		} else if (ResetTime >= 1) {	
 			RenderComponent::PlayAnimation(self, u"up");
-			GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);			
+			movingPlatformComponent->GotoWaypoint(1);
+			
 	//		Ascend sfx
 			GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{5c30c263-00ae-42a2-80a3-2ae33c8f13fe}");	
 			
 			self->AddTimer("AscentGUID", 0.1f);	
-			self->AddTimer("MoveDown", ResetTime + 2.5);	
-				
+			self->AddTimer("MoveDown", ResetTime + 2);	
+
 		} else {
-			GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);	
+			movingPlatformComponent->GotoWaypoint(1);
+			
 			if (AttachedPath == u"Spinner1") {
 				self->AddTimer("PlayAnim", 0.2f);			
-			} 
+			}
 		} 
 	}
 }
@@ -67,7 +73,9 @@ void SimpleOnceMover::OnTimerDone(Entity* self, std::string timerName) {
 	} 
 	else if (timerName == "MoveDown") {	
 		RenderComponent::PlayAnimation(self, u"down");
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);
+		
+		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+		movingPlatformComponent->GotoWaypoint(0);
 			
 //		Descend sfx
 		GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{40e86d71-084c-4149-884e-ab9b45b694dc}");	

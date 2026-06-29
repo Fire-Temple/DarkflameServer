@@ -114,18 +114,16 @@ void TacArcBehavior::Calculate(BehaviorContext* context, RakNet::BitStream& bitS
 	context->FilterTargets(validTargets, this->m_ignoreFactionList, this->m_includeFactionList, this->m_targetSelf, this->m_targetEnemy, this->m_targetFriend, this->m_targetTeam);
 
 	for (auto validTarget : validTargets) {
-		if (targets.size() >= this->m_maxTargets) break;
 		if (std::find(targets.begin(), targets.end(), validTarget) != targets.end()) continue;
 		if (validTarget->GetIsDead()) continue;
 
 		const auto targetPos = validTarget->GetPosition();
 
-		// make sure we aren't too high or low in comparison to the targer
-		const auto heightDifference = std::abs(reference.y - targetPos.y);
-		if (targetPos.y > reference.y && heightDifference > this->m_upperBound || targetPos.y < reference.y && heightDifference > this->m_lowerBound)
+		// make sure we aren't too high or low in comparison to the target
+		if (targetPos.y > (reference.y + m_upperBound) || targetPos.y < (reference.y + m_lowerBound))
 			continue;
 
-		const auto forward = self->GetRotation().GetForwardVector();
+		const auto forward = QuatUtils::Forward(self->GetRotation());
 
 		// forward is a normalized vector of where the caster is facing.
 		// targetPos is the position of the target.
@@ -147,13 +145,28 @@ void TacArcBehavior::Calculate(BehaviorContext* context, RakNet::BitStream& bitS
 		}
 	}
 
-	std::sort(targets.begin(), targets.end(), [reference](Entity* a, Entity* b) {
+	std::sort(targets.begin(), targets.end(), [this, reference, combatAi](Entity* a, Entity* b) {
 		const auto aDistance = Vector3::DistanceSquared(reference, a->GetPosition());
 		const auto bDistance = Vector3::DistanceSquared(reference, b->GetPosition());
 
-		return aDistance > bDistance;
+		return aDistance < bDistance;
 		});
 
+
+	if (m_useAttackPriority) {
+		// this should be using the attack priority column on the destroyable component
+		// We want targets with no threat level to remain the same order as above
+		// std::stable_sort(targets.begin(), targets.end(), [combatAi](Entity* a, Entity* b) {
+		// 	const auto aThreat = combatAi->GetThreat(a->GetObjectID());
+		// 	const auto bThreat = combatAi->GetThreat(b->GetObjectID());
+
+		// 	If enabled for this behavior, prioritize threat over distance
+		// 	return aThreat > bThreat;
+		// 	});
+	}
+
+	// After we've sorted and found our closest targets, size the vector down in case there are too many
+	if (m_maxTargets > 0 && targets.size() > m_maxTargets) targets.resize(m_maxTargets);
 	const auto hit = !targets.empty();
 	bitStream.Write(hit);
 
@@ -194,9 +207,13 @@ void TacArcBehavior::Load() {
 		GetFloat("offset_y", 0.0f),
 		GetFloat("offset_z", 0.0f)
 	);
+	// https://explorer.lu/skills/behaviors/6212/6203 HACK: i cant figure out why the dragon fire wall doesnt work with the offset, probably has to be fixed with the near/far height parameters
+	if (m_behaviorId == 6203) {
+		this->m_offset = NiPoint3Constant::ZERO;
+	}
 	this->m_method = GetInt("method", 1);
-	this->m_upperBound = std::abs(GetFloat("upper_bound", 4.4f));
-	this->m_lowerBound = std::abs(GetFloat("lower_bound", 0.4f));
+	this->m_upperBound = GetFloat("upper_bound", 4.4f);
+	this->m_lowerBound = GetFloat("lower_bound", 0.4f) - 5.0f; // Makes it so players and objects can still be targetted when slightly below the caster.  FIXME: use bounding spheres at some point
 	this->m_usePickedTarget = GetBoolean("use_picked_target", false);
 	this->m_useTargetPostion = GetBoolean("use_target_position", false);
 	this->m_checkEnv = GetBoolean("check_env", false);

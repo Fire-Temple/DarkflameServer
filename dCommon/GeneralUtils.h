@@ -3,7 +3,7 @@
 // C++
 #include <charconv>
 #include <cstdint>
-#include <cmath> 
+#include <cmath>
 #include <ctime>
 #include <functional>
 #include <optional>
@@ -19,6 +19,9 @@
 #include "dPlatforms.h"
 #include "Game.h"
 #include "Logger.h"
+#include "DluAssert.h"
+
+#include <glm/ext/vector_float3.hpp>
 
 enum eInventoryType : uint32_t;
 enum class eObjectBits : size_t;
@@ -202,6 +205,12 @@ namespace GeneralUtils {
 		return isParsed ? static_cast<T>(result) : std::optional<T>{};
 	}
 
+	// A version of TryParse that will return `errorVal` if `str` failed to parse.
+	template <Numeric T>
+	[[nodiscard]] T TryParse(std::string_view str, const T errorVal) {
+		return TryParse<T>(str).value_or(errorVal);
+	}
+
 	template<typename T>
 		requires(!Numeric<T>)
 	[[nodiscard]] std::optional<T> TryParse(std::string_view str);
@@ -234,6 +243,12 @@ namespace GeneralUtils {
 		return std::nullopt;
 	}
 
+	// A version of TryParse that will return `errorVal` if `str` failed to parse.
+	template <std::floating_point T>
+	[[nodiscard]] T TryParse(std::string_view str, const T errorVal) {
+		return TryParse<T>(str).value_or(errorVal);
+	}
+
 #endif
 
 	/**
@@ -244,7 +259,7 @@ namespace GeneralUtils {
 	 * @returns An std::optional containing the desired NiPoint3 if it can be constructed from the string parameters
 	*/
 	template <typename T>
-	[[nodiscard]] std::optional<NiPoint3> TryParse(const std::string_view strX, const std::string_view strY, const std::string_view strZ) {
+	[[nodiscard]] std::optional<T> TryParse(const std::string_view strX, const std::string_view strY, const std::string_view strZ) {
 		const auto x = TryParse<float>(strX);
 		if (!x) return std::nullopt;
 
@@ -252,7 +267,12 @@ namespace GeneralUtils {
 		if (!y) return std::nullopt;
 
 		const auto z = TryParse<float>(strZ);
-		return z ? std::make_optional<NiPoint3>(x.value(), y.value(), z.value()) : std::nullopt;
+		return z ? std::make_optional<T>(x.value(), y.value(), z.value()) : std::nullopt;
+	}
+
+	// Alternative overload of TryParse with a default value
+	[[nodiscard]] inline NiPoint3 TryParse(const std::string_view strX, const std::string_view strY, const std::string_view strZ, const NiPoint3 errorVal) {
+		return TryParse<NiPoint3>(strX, strY, strZ).value_or(errorVal);
 	}
 
 	/**
@@ -261,8 +281,13 @@ namespace GeneralUtils {
 	 * @returns An std::optional containing the desired NiPoint3 if it can be constructed from the string parameters
 	*/
 	template <typename T>
-	[[nodiscard]] std::optional<NiPoint3> TryParse(const std::span<const std::string> str) {
-		return (str.size() == 3) ? TryParse<NiPoint3>(str[0], str[1], str[2]) : std::nullopt;
+	[[nodiscard]] std::optional<T> TryParse(const std::span<const std::string> str) {
+		return (str.size() == 3) ? TryParse<T>(str[0], str[1], str[2]) : std::nullopt;
+	}
+
+	// Alternative overload of TryParse with a default value
+	[[nodiscard]] inline NiPoint3 TryParse(const std::span<const std::string> str, const NiPoint3 errorVal) {
+		return TryParse<NiPoint3>(str).value_or(errorVal);
 	}
 
 	template <typename T>
@@ -298,6 +323,12 @@ namespace GeneralUtils {
 		}
 
 		return T();
+	}
+
+	template<typename Container>
+	inline Container::value_type GetRandomElement(const Container& container) {
+		DluAssert(!container.empty());
+		return container[GenerateRandomNumber<typename Container::size_type>(0, container.size() - 1)];
 	}
 
 	/**

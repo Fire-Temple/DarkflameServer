@@ -19,7 +19,7 @@ void MySQLDatabase::InsertNewMail(const MailInfo& mail) {
 		mail.itemCount);
 }
 
-std::vector<MailInfo> MySQLDatabase::GetMailForPlayer(const uint32_t characterId, const uint32_t numberOfMail) {
+std::vector<MailInfo> MySQLDatabase::GetMailForPlayer(const LWOOBJID characterId, const uint32_t numberOfMail) {
 	auto res = ExecuteSelect(
 		"SELECT id, subject, body, sender_name, attachment_id, attachment_lot, attachment_subkey, attachment_count, was_read, time_sent"
 		" FROM mail WHERE receiver_id=? limit ?;",
@@ -48,7 +48,7 @@ std::vector<MailInfo> MySQLDatabase::GetMailForPlayer(const uint32_t characterId
 }
 
 std::optional<MailInfo> MySQLDatabase::GetMail(const uint64_t mailId) {
-	auto res = ExecuteSelect("SELECT attachment_lot, attachment_count FROM mail WHERE id=? LIMIT 1;", mailId);
+	auto res = ExecuteSelect("SELECT attachment_lot, attachment_count, receiver_id FROM mail WHERE id=? LIMIT 1;", mailId);
 
 	if (!res->next()) {
 		return std::nullopt;
@@ -57,11 +57,12 @@ std::optional<MailInfo> MySQLDatabase::GetMail(const uint64_t mailId) {
 	MailInfo toReturn;
 	toReturn.itemLOT = res->getInt("attachment_lot");
 	toReturn.itemCount = res->getInt("attachment_count");
+	toReturn.receiverId = res->getUInt64("receiver_id");
 
 	return toReturn;
 }
 
-uint32_t MySQLDatabase::GetUnreadMailCount(const uint32_t characterId) {
+uint32_t MySQLDatabase::GetUnreadMailCount(const LWOOBJID characterId) {
 	auto res = ExecuteSelect("SELECT COUNT(*) AS number_unread FROM mail WHERE receiver_id=? AND was_read=0;", characterId);
 
 	if (!res->next()) {

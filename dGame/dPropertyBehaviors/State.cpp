@@ -163,10 +163,14 @@ void State::Deserialize(const tinyxml2::XMLElement& state) {
 	}
 }
 
-void State::Update(float deltaTime, ModelComponent& modelComponent) {
-	for (auto& strip : m_Strips) strip.Update(deltaTime, modelComponent);
+void State::Update(float deltaTime, ModelComponent& modelComponent, UpdateResult& updateResult) {
+	for (auto& strip : m_Strips) strip.Update(deltaTime, modelComponent, updateResult);
 }
 
 void State::OnChatMessageReceived(const std::string& sMessage) {
 	for (auto& strip : m_Strips) strip.OnChatMessageReceived(sMessage);
+}
+
+void State::OnHit() {
+	for (auto& strip : m_Strips) strip.OnHit();
 }

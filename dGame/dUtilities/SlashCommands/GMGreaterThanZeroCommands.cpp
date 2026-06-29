@@ -141,7 +141,6 @@ namespace GMGreaterThanZeroCommands {
 					characterId = characterInfo->id;
 
 					GeneralUtils::SetBit(characterId, eObjectBits::CHARACTER);
-					GeneralUtils::SetBit(characterId, eObjectBits::PERSISTENT);
 				}
 
 				if (accountId == 0) {
@@ -197,7 +196,7 @@ namespace GMGreaterThanZeroCommands {
 
 			//Notify chat about it
 			CBITSTREAM;
-			BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::GM_MUTE);
+			BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::GM_MUTE);
 
 			bitStream.Write(characterId);
 			bitStream.Write(expire);
@@ -276,7 +275,8 @@ namespace GMGreaterThanZeroCommands {
 	}
 
 	void GmInvis(Entity* entity, const SystemAddress& sysAddr, const std::string args) {
-		GameMessages::SendToggleGMInvis(entity->GetObjectID(), true, UNASSIGNED_SYSTEM_ADDRESS);
+		GameMessages::ToggleGMInvis msg;
+		msg.Send(entity->GetObjectID());
 	}
 
 	void SetName(Entity* entity, const SystemAddress& sysAddr, const std::string args) {

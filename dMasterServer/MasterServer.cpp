@@ -23,7 +23,7 @@
 #include "dServer.h"
 #include "AssetManager.h"
 #include "BinaryPathFinder.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Master.h"
 
 //RakNet includes:
@@ -35,7 +35,6 @@
 #include "Game.h"
 #include "InstanceManager.h"
 #include "MasterPackets.h"
-#include "PersistentIDManager.h"
 #include "FdbToSqlite.h"
 #include "BitStreamUtils.h"
 #include "Start.h"
@@ -46,10 +45,18 @@
 
 #ifdef DARKFLAME_PLATFORM_UNIX
 
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+#include <windows.h>
+using pid_t = DWORD;
+#endif
+
 
 namespace Game {
 	Logger* logger = nullptr;
@@ -69,6 +76,11 @@ void HandlePacket(Packet* packet);
 std::map<uint32_t, std::string> activeSessions;
 SystemAddress authServerMasterPeerSysAddr;
 SystemAddress chatServerMasterPeerSysAddr;
+
+// purge related
+void HandlePurge();
+uint32_t safeZoneID = 4294967295;
+uint32_t safeInstanceID = 4294967295;
 
 int GenerateBCryptPassword(const std::string& password, const int workFactor, char salt[BCRYPT_HASHSIZE], char hash[BCRYPT_HASHSIZE]) {
 	int32_t bcryptState = ::bcrypt_gensalt(workFactor, salt);
@@ -94,11 +106,13 @@ int main(int argc, char** argv) {
 	std::signal(SIGINT, Game::OnSignal);
 	std::signal(SIGTERM, Game::OnSignal);
 
+
 	Game::config = new dConfig("masterconfig.ini");
 
 	//Create all the objects we need to run our service:
 	Server::SetupLogger("MasterServer");
 	if (!Game::logger) return EXIT_FAILURE;
+	Game::config->LogSettings();
 
 	auto folders = { "navmeshes", "migrations", "vanity" };
 
@@ -159,11 +173,10 @@ int main(int argc, char** argv) {
 	}
 
 	MigrationRunner::RunMigrations();
+	Database::Get()->Commit();
+
 	const auto resServerPath = BinaryPathFinder::GetBinaryDir() / "resServer";
 	std::filesystem::create_directories(resServerPath);
-	const bool cdServerExists = std::filesystem::exists(resServerPath / "CDServer.sqlite");
-	const bool oldCDServerExists = std::filesystem::exists(Game::assetManager->GetResPath() / "CDServer.sqlite");
-	const bool fdbExists = std::filesystem::exists(Game::assetManager->GetResPath() / "cdclient.fdb");
 	const bool resServerPathExists = std::filesystem::is_directory(resServerPath);
 
 	if (!resServerPathExists) {
@@ -174,9 +187,59 @@ int main(int argc, char** argv) {
 		}
 	}
 
+
+	std::string fdbTimestamp;
+	bool shouldRemoveCDServer = false;
+	try {
+		const auto fdbPath = Game::assetManager->GetResPath() / "cdclient.fdb";
+
+		if (std::filesystem::exists(fdbPath)) {
+			auto ftime = std::filesystem::last_write_time(fdbPath);
+
+			// Convert file_time_type to system_clock::time_point
+			auto sctp = std::chrono::system_clock::time_point(
+				std::chrono::duration_cast<std::chrono::system_clock::duration>(
+					ftime.time_since_epoch()
+				)
+			);
+
+			std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
+
+			std::ostringstream timeStream;
+			timeStream << std::put_time(std::gmtime(&cftime), "%Y-%m-%dT%H:%M:%SZ");
+			fdbTimestamp = timeStream.str();
+
+			LOG("cdclient.fdb timestamp: %s", fdbTimestamp.c_str());
+
+			// Compare with config value
+			const std::string currentTimestamp = Game::config->GetValue("cdclient_timestamp");
+			if (currentTimestamp != fdbTimestamp) {
+				LOG("cdclient.fdb timestamp mismatch detected — CDServer.sqlite will be rebuilt.");
+				shouldRemoveCDServer = true;
+			}
+		} else {
+			LOG("cdclient.fdb not found at %s", fdbPath.string().c_str());
+		}
+	} catch (const std::exception& e) {
+		LOG("Error checking cdclient.fdb timestamp: %s", e.what());
+	}
+
+	if (shouldRemoveCDServer) {
+		const auto cdServerPath = resServerPath / "CDServer.sqlite";
+		if (std::filesystem::exists(cdServerPath)) {
+			LOG("Deleting old CDServer.sqlite due to cdclient.fdb change...");
+			std::filesystem::remove(cdServerPath);
+		}
+	}
+
+
+	const bool cdServerExists = std::filesystem::exists(resServerPath / "CDServer.sqlite");
+	const bool oldCDServerExists = std::filesystem::exists(Game::assetManager->GetResPath() / "CDServer.sqlite");
+	const bool fdbExists = std::filesystem::exists(Game::assetManager->GetResPath() / "cdclient.fdb");
+
 	if (!cdServerExists) {
 		if (oldCDServerExists) {
-			// If the file doesn't exist in the new CDServer location, copy it there.  We copy because we may not have write permissions from the previous directory.
+			// If the file doesn't exist in the new CDServer location, copy it there.
 			LOG("CDServer.sqlite is not located at resServer, but is located at res path.  Copying file...");
 			std::filesystem::copy_file(Game::assetManager->GetResPath() / "CDServer.sqlite", resServerPath / "CDServer.sqlite");
 		} else {
@@ -199,6 +262,45 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
+
+	if (shouldRemoveCDServer && !fdbTimestamp.empty()) {
+		const auto masterConfigPath = BinaryPathFinder::GetBinaryDir() / "masterconfig.ini";
+
+		try {
+			std::ifstream inFile(masterConfigPath);
+			std::string content;
+			std::string line;
+			bool foundLine = false;
+
+			if (inFile.is_open()) {
+				while (std::getline(inFile, line)) {
+					if (line.rfind("cdclient_timestamp=", 0) == 0) {
+						content += "cdclient_timestamp=" + fdbTimestamp + "\n";
+						foundLine = true;
+					} else {
+						content += line + "\n";
+					}
+				}
+				inFile.close();
+			}
+
+			if (!foundLine) {
+				content += "\ncdclient_timestamp=" + fdbTimestamp + "\n";
+			}
+
+			std::ofstream outFile(masterConfigPath, std::ios::trunc);
+			if (outFile.is_open()) {
+				outFile << content;
+				outFile.close();
+				LOG("Updated cdclient_timestamp in masterconfig.ini after successful rebuild.");
+			} else {
+				LOG("Failed to open masterconfig.ini for writing.");
+			}
+		} catch (const std::exception& e) {
+			LOG("Error writing cdclient_timestamp: %s", e.what());
+		}
+	}
+
 
 	//Connect to CDClient
 	try {
@@ -326,6 +428,77 @@ int main(int argc, char** argv) {
 		return EXIT_SUCCESS;
 	}
 
+
+	// Check for -pid <processID> flag
+	pid_t monitorPid = -1;
+	for (int i = 1; i < argc; ++i) {
+		if (strcmp(argv[i], "-pid") == 0 && i + 1 < argc) {
+			monitorPid = static_cast<pid_t>(std::stoi(argv[i + 1]));
+			break;
+		}
+	}
+
+	if (monitorPid != -1) {
+
+		// If bad PID, skip
+		if (monitorPid <= 0) {
+			LOG("Invalid or missing PID provided with -pid flag. Exiting.");
+			return EXIT_SUCCESS;
+		}
+
+		LOG("Monitoring external process with PID %d", monitorPid);
+
+		// Start thread
+		std::thread([monitorPid]() {
+#ifdef DARKFLAME_PLATFORM_UNIX
+			// Does PID exist?
+			if (kill(monitorPid, 0) == -1) {
+				LOG("Process %d not found or not accessible. Exiting.", monitorPid);
+				std::exit(EXIT_SUCCESS);
+			}
+#endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+			HANDLE hProc = OpenProcess(SYNCHRONIZE, FALSE, monitorPid);
+			if (!hProc) {
+				LOG("Process %d could not be opened. Exiting.", monitorPid);
+				std::exit(EXIT_SUCCESS);
+			}
+			CloseHandle(hProc);
+#endif
+
+			while (true) {
+#ifdef DARKFLAME_PLATFORM_UNIX
+				// kill(pid, 0) returns 0 if process exists, -1 if not
+				if (kill(monitorPid, 0) == -1) {
+					LOG("Watched process %d exited, shutting down MasterServer...", monitorPid);
+					std::raise(SIGINT);
+					break;
+				}
+#endif
+
+#ifdef DARKFLAME_PLATFORM_WIN32
+				HANDLE hProc = OpenProcess(SYNCHRONIZE, FALSE, monitorPid);
+				if (hProc) {
+					DWORD result = WaitForSingleObject(hProc, 1000);
+					CloseHandle(hProc);
+					if (result == WAIT_OBJECT_0) {
+						LOG("Watched process %d exited, shutting down MasterServer...", monitorPid);
+						std::raise(SIGINT);
+						break;
+					}
+				} else {
+					LOG("Could not open process %d, assuming it has exited.", monitorPid);
+					std::raise(SIGINT);
+					break;
+				}
+#endif
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+			}
+		}).detach();
+	}
+
+
 	Game::randomEngine = std::mt19937(time(0));
 	uint32_t maxClients = 999;
 	uint32_t ourPort = 2000;
@@ -343,7 +516,7 @@ int main(int argc, char** argv) {
 	int res = GenerateBCryptPassword(!cfgPassword.empty() ? cfgPassword : "3.25DARKFLAME1", 13, salt, hash);
 	assert(res == 0);
 
-	Game::server = new dServer(ourIP, ourPort, 0, maxClients, true, false, Game::logger, "", 0, ServerType::Master, Game::config, &Game::lastSignal, hash);
+	Game::server = new dServer(ourIP, ourPort, 0, maxClients, true, false, Game::logger, "", 0, ServiceType::MASTER, Game::config, &Game::lastSignal, hash);
 
 	std::string master_server_ip = "localhost";
 	const auto masterServerIPString = Game::config->GetValue("master_ip");
@@ -358,7 +531,6 @@ int main(int argc, char** argv) {
 	Database::Get()->SetMasterInfo(info);
 
 	//Create additional objects here:
-	PersistentIDManager::Initialize();
 	Game::im = new InstanceManager(Game::server->GetIP());
 
 	//Get CDClient initial information
@@ -530,19 +702,8 @@ void HandlePacket(Packet* packet) {
 
 	if (packet->length < 4) return;
 
-	if (static_cast<eConnectionType>(packet->data[1]) == eConnectionType::MASTER) {
+	if (static_cast<ServiceType>(packet->data[1]) == ServiceType::MASTER) {
 		switch (static_cast<MessageType::Master>(packet->data[3])) {
-		case MessageType::Master::REQUEST_PERSISTENT_ID: {
-			LOG("A persistent ID req");
-			RakNet::BitStream inStream(packet->data, packet->length, false);
-			uint64_t header = inStream.Read(header);
-			uint64_t requestID = 0;
-			inStream.Read(requestID);
-
-			uint32_t objID = PersistentIDManager::GeneratePersistentID();
-			MasterPackets::SendPersistentIDResponse(Game::server, packet->systemAddress, requestID, objID);
-			break;
-		}
 
 		case MessageType::Master::REQUEST_ZONE_TRANSFER: {
 			LOG("Received zone transfer req");
@@ -592,7 +753,7 @@ void HandlePacket(Packet* packet) {
 			uint32_t theirPort = 0;
 			uint32_t theirZoneID = 0;
 			uint32_t theirInstanceID = 0;
-			ServerType theirServerType;
+			ServiceType theirServerType;
 			LUString theirIP;
 
 			inStream.Read(theirPort);
@@ -601,10 +762,10 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirServerType);
 			inStream.Read(theirIP);
 
-			if (theirServerType == ServerType::World) {
+			switch (theirServerType) {
+			case ServiceType::WORLD:
 				if (!Game::im->IsPortInUse(theirPort)) {
 					auto in = std::make_unique<Instance>(theirIP.string, theirPort, theirZoneID, theirInstanceID, 0, 12, 12);
-
 					in->SetSysAddr(packet->systemAddress);
 					Game::im->AddInstance(in);
 				} else {
@@ -613,14 +774,16 @@ void HandlePacket(Packet* packet) {
 						instance->SetSysAddr(packet->systemAddress);
 					}
 				}
-			}
-
-			if (theirServerType == ServerType::Chat) {
+                break;
+			case ServiceType::CHAT:
 				chatServerMasterPeerSysAddr = packet->systemAddress;
-			}
-
-			if (theirServerType == ServerType::Auth) {
-				authServerMasterPeerSysAddr = packet->systemAddress;
+				break;
+            case ServiceType::AUTH:
+                authServerMasterPeerSysAddr = packet->systemAddress;
+                break;
+			default:
+				// We just ignore any other server type
+				break;
 			}
 
 			LOG("Received %s server info, instance: %i port: %i", StringifiedEnum::ToString(theirServerType).data(), theirInstanceID, theirPort);
@@ -640,7 +803,7 @@ void HandlePacket(Packet* packet) {
 					activeSessions.erase(it.first);
 
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::NEW_SESSION_ALERT);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::NEW_SESSION_ALERT);
 					bitStream.Write(sessionKey);
 					bitStream.Write(username);
 					SEND_PACKET_BROADCAST;
@@ -662,7 +825,7 @@ void HandlePacket(Packet* packet) {
 			for (auto key : activeSessions) {
 				if (key.second == username.GetAsString()) {
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SESSION_KEY_RESPONSE);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SESSION_KEY_RESPONSE);
 					bitStream.Write(key.first);
 					bitStream.Write(username);
 					Game::server->Send(bitStream, packet->systemAddress, false);
@@ -682,10 +845,19 @@ void HandlePacket(Packet* packet) {
 			inStream.Read(theirZoneID);
 			inStream.Read(theirInstanceID);
 
-			const auto& instance =
-				Game::im->FindInstance(theirZoneID, theirInstanceID);
+			const auto& instance = Game::im->FindInstance(theirZoneID, theirInstanceID);
 			if (instance) {
-				instance->AddPlayer(Player());
+				instance->AddPlayer(Player());	
+
+				if (theirZoneID == safeZoneID && theirInstanceID == safeInstanceID) {
+					// Player reached safe zone, purge the remaining zones
+					HandlePurge();
+					
+					// Since 0 is a zone, yeah this is fine
+					safeZoneID = 4294967295;
+					safeInstanceID = 4294967295;
+				}
+				
 			} else {
 				LOG("Instance missing? What?");
 			}
@@ -849,65 +1021,24 @@ void HandlePacket(Packet* packet) {
 			break;
 		}
 		
-		case MessageType::Master::SHUTDOWN_INSTANCE: {
+		
+		case MessageType::Master::PURGE_WORLDS: {		
 			RakNet::BitStream inStream(packet->data, packet->length, false);
 			uint64_t header = inStream.Read(header);
 
-			uint32_t zoneID;
-			uint16_t instanceID;
-
+			uint32_t zoneID = 0;
+			uint32_t instanceID = 0;
+			
 			inStream.Read(zoneID);
-			inStream.Read(instanceID);
+			inStream.Read(instanceID);			
+			
+			safeZoneID = zoneID;
+			safeInstanceID = instanceID;
 
-			Game::logger->Log("MasterServer","Attempting to shutdown an zone %i instance %i via slash command\n", zoneID, instanceID);
-
-			const auto& instance = Game::im->FindInstance(zoneID, instanceID);
-
-			if (instance) {
-				Game::logger->Log("MasterServer","Shutting down found instance\n");
-				instance->Shutdown();
-			} else {
-				Game::logger->Log("MasterServer","Failed to find instance!\n");
-			}
+			LOG("Received purge command. Assigning safe zone as zoneID %i instanceID %i", safeZoneID, safeInstanceID);		
+			
 			break;
-		}
-
-		case MessageType::Master::GET_INSTANCES: {
-			RakNet::BitStream inStream(packet->data, packet->length, false);
-			uint64_t header = inStream.Read(header);
-
-			uint64_t objectID;
-			uint16_t zoneID = LWOMAPID_INVALID;
-			uint16_t respondingZoneID;
-			uint16_t respondingInstanceID;
-
-			inStream.Read(objectID);
-			if (inStream.ReadBit()) inStream.Read(zoneID);
-			inStream.Read(respondingZoneID);
-			inStream.Read(respondingInstanceID);
-
-			CBITSTREAM
-
-			BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::RESPOND_INSTANCES);
-
-			bitStream.Write(objectID);
-
-			auto respondingSysAddr = Game::im->FindInstance(respondingZoneID, respondingInstanceID)->GetSysAddr();
-
-			const auto& instances = Game::im->GetInstances();
-
-			bitStream.Write<uint32_t>(instances.size());
-
-			for (uint32_t i = 0; i < instances.size(); i++) {
-				bitStream.Write(instances[i]->GetZoneID().GetMapID());
-				bitStream.Write(instances[i]->GetZoneID().GetCloneID());
-				bitStream.Write(instances[i]->GetZoneID().GetInstanceID());
-			}
-
-			Game::server->Send(bitStream, respondingSysAddr, false);
-
-			break;
-		}
+		}		
 
 		default:
 			LOG("Unknown master packet ID from server: %i", packet->data[3]);
@@ -933,13 +1064,10 @@ int ShutdownSequence(int32_t signal) {
 
 	{
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SHUTDOWN);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SHUTDOWN);
 		Game::server->Send(bitStream, UNASSIGNED_SYSTEM_ADDRESS, true);
 		LOG("Triggered master shutdown");
 	}
-
-	PersistentIDManager::SaveToDatabase();
-	LOG("Saved ObjectIDTracker to DB");
 
 	// A server might not be finished spinning up yet, remove all of those here.
 	for (const auto& instance : Game::im->GetInstances()) {
@@ -1012,4 +1140,36 @@ int32_t FinalizeShutdown(int32_t signal) {
 
 	if (signal != EXIT_SUCCESS) exit(signal);
 	return signal;
+}
+
+
+
+void HandlePurge() {
+	LOG("Destroying instances");
+
+	const auto& instances = Game::im->GetInstances();
+
+	for (const auto& instance : instances) {
+		if (instance == nullptr) {
+			break;
+		} else if (instance->GetMapID() != safeZoneID || instance->GetInstanceID() != safeInstanceID) {
+			instance->Shutdown();
+			instance->SetIsShuttingDown(true);
+			Game::im->RedirectPendingRequests(instance);
+		} else {
+			LOG("skipped instance with ZoneID %i and InstanceID %i", safeZoneID, safeInstanceID);
+		}
+	}
+
+	// Remove instances
+	for (const auto& instance : instances) {
+		if (instance == nullptr) {
+			break;
+		}
+
+		if (instance->GetShutdownComplete()) {
+			Game::im->RemoveInstance(instance);
+		}
+	}	
+	
 }

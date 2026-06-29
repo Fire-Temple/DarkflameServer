@@ -10,7 +10,6 @@
 #include "SkillComponent.h"
 #include "SwitchComponent.h"
 #include "UserManager.h"
-#include "Metrics.hpp"
 #include "dZoneManager.h"
 #include "MissionComponent.h"
 #include "Game.h"
@@ -56,6 +55,45 @@ std::vector<LOT> EntityManager::m_GhostingExcludedLOTs = {
 	4967
 };
 
+template<typename T>
+void ParseDelimSetting(std::set<T>& setting, const std::string_view settingName, const char delim = ',') {
+	const auto str = Game::config->GetValue(settingName.data());
+	setting.clear();
+	for (const auto& strVal : GeneralUtils::SplitString(str, delim)) {
+		const auto val = GeneralUtils::TryParse<T>(strVal);
+		if (val) {
+			setting.insert(val.value());
+		}
+	}
+}
+
+void EntityManager::ReloadConfig() {
+	auto hcmode = Game::config->GetValue("hardcore_mode");
+	m_HardcoreMode = hcmode.empty() ? false : (hcmode == "1");
+	auto hcUscorePercent = Game::config->GetValue("hardcore_lose_uscore_on_death_percent");
+	m_HardcoreLoseUscoreOnDeathPercent = hcUscorePercent.empty() ? 10 : GeneralUtils::TryParse<uint32_t>(hcUscorePercent).value_or(10);
+	auto hcUscoreMult = Game::config->GetValue("hardcore_uscore_enemies_multiplier");
+	m_HardcoreUscoreEnemiesMultiplier = hcUscoreMult.empty() ? 2 : GeneralUtils::TryParse<uint32_t>(hcUscoreMult).value_or(2);
+	auto hcDropInv = Game::config->GetValue("hardcore_dropinventory_on_death");
+	m_HardcoreDropinventoryOnDeath = hcDropInv.empty() ? false : (hcDropInv == "1");
+	ParseDelimSetting<LOT>(m_HardcoreExcludedItemDrops, "hardcore_excluded_item_drops");
+
+	// We don't need to save the worlds, just need to check if this one is in the list
+	std::set<LWOMAPID> worlds;
+	ParseDelimSetting<LWOMAPID>(worlds, "hardcore_uscore_reduced_worlds");
+	m_HardcoreUscoreReduced = worlds.contains(Game::zoneManager->GetZoneID().GetMapID());
+
+	ParseDelimSetting<LOT>(m_HardcoreUscoreReducedLots, "hardcore_uscore_reduced_lots");
+	ParseDelimSetting<LOT>(m_HardcoreUscoreExcludedEnemies, "hardcore_uscore_excluded_enemies");
+	ParseDelimSetting<LWOMAPID>(m_HardcoreDisabledWorlds, "hardcore_disabled_worlds");
+
+	auto hcXpReduction = Game::config->GetValue("hardcore_uscore_reduction");
+	m_HardcoreUscoreReduction = hcXpReduction.empty() ? 1.0f : GeneralUtils::TryParse<float>(hcXpReduction).value_or(1.0f);
+	m_HardcoreMode = GetHardcoreDisabledWorlds().contains(Game::zoneManager->GetZoneID().GetMapID()) ? false : m_HardcoreMode;
+	auto hcCoinKeep = Game::config->GetValue("hardcore_coin_keep");
+	m_HardcoreCoinKeep = hcCoinKeep.empty() ? false : GeneralUtils::TryParse<float>(hcCoinKeep).value_or(0.0f);
+}
+
 void EntityManager::Initialize() {
 	// Check if this zone has ghosting enabled
 	m_GhostingEnabled = std::find(
@@ -65,15 +103,8 @@ void EntityManager::Initialize() {
 	) == m_GhostingExcludedZones.end();
 
 	// grab hardcore mode settings and load them with sane defaults
-	auto hcmode = Game::config->GetValue("hardcore_mode");
-	m_HardcoreMode = hcmode.empty() ? false : (hcmode == "1");
-	auto hcUscorePercent = Game::config->GetValue("hardcore_lose_uscore_on_death_percent");
-	m_HardcoreLoseUscoreOnDeathPercent = hcUscorePercent.empty() ? 10 : std::stoi(hcUscorePercent);
-	auto hcUscoreMult = Game::config->GetValue("hardcore_uscore_enemies_multiplier");
-	m_HardcoreUscoreEnemiesMultiplier = hcUscoreMult.empty() ? 2 : std::stoi(hcUscoreMult);
-	auto hcDropInv = Game::config->GetValue("hardcore_dropinventory_on_death");
-	m_HardcoreDropinventoryOnDeath = hcDropInv.empty() ? false : (hcDropInv == "1");
-
+	Game::config->AddConfigHandler([]() {Game::entityManager->ReloadConfig();});
+	Game::entityManager->ReloadConfig();
 	// If cloneID is not zero, then hardcore mode is disabled
 	// aka minigames and props
 	if (Game::zoneManager->GetZoneID().GetCloneID() != 0) m_HardcoreMode = false;
@@ -133,6 +164,8 @@ Entity* EntityManager::CreateEntity(EntityInfo info, User* user, Entity* parentE
 	// Set the zone control entity if the entity is a zone control object, this should only happen once
 	if (controller) {
 		m_ZoneControlEntity = entity;
+		// Proooooobably shouldn't ghost zoneControl
+		m_ZoneControlEntity->SetIsGhostingCandidate(false);
 	}
 
 	// Check if this entity is a respawn point, if so add it to the registry
@@ -283,6 +316,8 @@ std::vector<Entity*> EntityManager::GetEntitiesByComponent(const eReplicaCompone
 
 			withComp.push_back(entity);
 		}
+	} else {
+		for (auto* const entity : m_Entities | std::views::values) withComp.push_back(entity);
 	}
 	return withComp;
 }
@@ -330,16 +365,24 @@ void EntityManager::ConstructEntity(Entity* entity, const SystemAddress& sysAddr
 		LOG("Attempted to construct null entity");
 		return;
 	}
+	// Don't construct GM invisible entities unless it's for the GM themselves
+	// GMs can see other GMs if they are the same or lower level
+	GameMessages::GetGMInvis getGMInvisMsg;
+	getGMInvisMsg.Send(entity->GetObjectID());
+	if (getGMInvisMsg.bGMInvis && sysAddr != entity->GetSystemAddress()) {
+		auto* toUser = UserManager::Instance()->GetUser(sysAddr);
+		if (!toUser) return;
+		auto* constructedUser = UserManager::Instance()->GetUser(entity->GetSystemAddress());
+		if (!constructedUser) return;
+		if (toUser->GetMaxGMLevel() < constructedUser->GetMaxGMLevel()) return;
+	}
 
 	if (entity->GetNetworkId() == 0) {
 		uint16_t networkId;
-
 		if (!m_LostNetworkIds.empty()) {
 			networkId = m_LostNetworkIds.top();
 			m_LostNetworkIds.pop();
-		} else {
-			networkId = ++m_NetworkIdCounter;
-		}
+		} else networkId = ++m_NetworkIdCounter;
 
 		entity->SetNetworkId(networkId);
 	}
@@ -348,10 +391,8 @@ void EntityManager::ConstructEntity(Entity* entity, const SystemAddress& sysAddr
 		if (std::find(m_EntitiesToGhost.begin(), m_EntitiesToGhost.end(), entity) == m_EntitiesToGhost.end()) {
 			m_EntitiesToGhost.push_back(entity);
 		}
-
 		if (sysAddr == UNASSIGNED_SYSTEM_ADDRESS) {
 			CheckGhosting(entity);
-
 			return;
 		}
 	}
@@ -382,14 +423,9 @@ void EntityManager::ConstructEntity(Entity* entity, const SystemAddress& sysAddr
 		Game::server->Send(stream, sysAddr, false);
 	}
 
-	if (entity->IsPlayer()) {
-		if (entity->GetGMLevel() > eGameMasterLevel::CIVILIAN) {
-			GameMessages::SendToggleGMInvis(entity->GetObjectID(), true, sysAddr);
-		}
-	}
 }
 
-void EntityManager::ConstructAllEntities(const SystemAddress& sysAddr) {
+void EntityManager::ConstructAllEntities(const SystemAddress& sysAddr) {	
 	//ZoneControl is special:
 	ConstructEntity(m_ZoneControlEntity, sysAddr);
 
@@ -399,7 +435,7 @@ void EntityManager::ConstructAllEntities(const SystemAddress& sysAddr) {
 		}
 	}
 
-	UpdateGhosting(PlayerManager::GetPlayer(sysAddr), true);
+	UpdateGhosting(PlayerManager::GetPlayer(sysAddr));
 }
 
 void EntityManager::DestructEntity(Entity* entity, const SystemAddress& sysAddr) {
@@ -457,18 +493,14 @@ void EntityManager::QueueGhostUpdate(LWOOBJID playerID) {
 void EntityManager::UpdateGhosting() {
 	for (const auto playerID : m_PlayersToUpdateGhosting) {
 		auto* player = PlayerManager::GetPlayer(playerID);
-
-		if (player == nullptr) {
-			continue;
-		}
-
+		if (!player) continue;
 		UpdateGhosting(player);
 	}
 
 	m_PlayersToUpdateGhosting.clear();
 }
 
-void EntityManager::UpdateGhosting(Entity* player, const bool constructAll) {
+void EntityManager::UpdateGhosting(Entity* player) {
 	if (!player) return;
 
 	auto* missionComponent = player->GetComponent<MissionComponent>();
@@ -487,6 +519,7 @@ void EntityManager::UpdateGhosting(Entity* player, const bool constructAll) {
 		const auto observed = ghostComponent->IsObserved(id);
 
 		const auto distance = NiPoint3::DistanceSquared(referencePoint, entityPoint);
+
 
 		auto ghostingDistanceMax = m_GhostDistanceMaxSquared;
 		auto ghostingDistanceMin = m_GhostDistanceMinSqaured;
@@ -518,44 +551,31 @@ void EntityManager::UpdateGhosting(Entity* player, const bool constructAll) {
 
 			entity->SetObservers(entity->GetObservers() + 1);
 
-			// TODO: figure out if zone control should be ghosted at all
-			if (constructAll && entity->GetObjectID() == GetZoneControlEntity()->GetObjectID()) continue;
-
 			ConstructEntity(entity, player->GetSystemAddress());
 		}
 	}
 }
 
 void EntityManager::CheckGhosting(Entity* entity) {
-	if (entity == nullptr) {
-		return;
-	}
+	if (!entity) return;
 
 	const auto& referencePoint = entity->GetPosition();
-
 	for (auto* player : PlayerManager::GetAllPlayers()) {
 		auto* ghostComponent = player->GetComponent<GhostComponent>();
 		if (!ghostComponent) continue;
 
 		const auto& entityPoint = ghostComponent->GetGhostReferencePoint();
-
 		const auto id = entity->GetObjectID();
-
 		const auto observed = ghostComponent->IsObserved(id);
-
 		const auto distance = NiPoint3::DistanceSquared(referencePoint, entityPoint);
 
 		if (observed && distance > m_GhostDistanceMaxSquared) {
 			ghostComponent->GhostEntity(id);
-
 			DestructEntity(entity, player->GetSystemAddress());
-
 			entity->SetObservers(entity->GetObservers() - 1);
 		} else if (!observed && m_GhostDistanceMinSqaured > distance) {
 			ghostComponent->ObserveEntity(id);
-
 			ConstructEntity(entity, player->GetSystemAddress());
-
 			entity->SetObservers(entity->GetObservers() + 1);
 		}
 	}

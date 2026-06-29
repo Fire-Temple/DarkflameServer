@@ -29,6 +29,7 @@ namespace DEVGMCommands {
 	void DebugUi(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Dismount(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void ReloadConfig(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Reload(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void ForceSave(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Freecam(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void FreeMoney(Entity* entity, const SystemAddress& sysAddr, const std::string args);
@@ -76,6 +77,8 @@ namespace DEVGMCommands {
 	void DeleteInven(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Shutdown(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 	void Barfight(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Despawn(Entity* entity, const SystemAddress& sysAddr, const std::string args);
+	void Execute(Entity* entity, const SystemAddress& sysAddr, const std::string args);
 }
 
 #endif  //!DEVGMCOMMANDS_H

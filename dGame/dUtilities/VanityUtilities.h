@@ -8,7 +8,7 @@
 struct VanityObjectLocation {
 	float m_Chance = 1.0f;
 	NiPoint3 m_Position;
-	NiQuaternion m_Rotation;
+	NiQuaternion m_Rotation = QuatUtils::IDENTITY;
 	float m_Scale = 1.0f;
 };
 
@@ -19,7 +19,7 @@ struct VanityObject {
 	std::vector<LOT> m_Equipment;
 	std::vector<std::string> m_Phrases;
 	std::map<uint32_t, std::vector<VanityObjectLocation>> m_Locations;
-	std::vector<LDFBaseData*> m_Config;
+	LwoNameValue m_Config;
 };
 
 

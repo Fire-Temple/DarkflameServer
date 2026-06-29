@@ -30,7 +30,7 @@
 
 PropertyManagementComponent* PropertyManagementComponent::instance = nullptr;
 
-PropertyManagementComponent::PropertyManagementComponent(Entity* parent) : Component(parent) {
+PropertyManagementComponent::PropertyManagementComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	this->owner = LWOOBJID_EMPTY;
 	this->templateId = 0;
 	this->propertyId = LWOOBJID_EMPTY;
@@ -64,7 +64,6 @@ PropertyManagementComponent::PropertyManagementComponent(Entity* parent) : Compo
 		this->propertyId = propertyInfo->id;
 		this->owner = propertyInfo->ownerId;
 		GeneralUtils::SetBit(this->owner, eObjectBits::CHARACTER);
-		GeneralUtils::SetBit(this->owner, eObjectBits::PERSISTENT);
 		this->clone_Id = propertyInfo->cloneId;
 		this->propertyName = propertyInfo->name;
 		this->propertyDescription = propertyInfo->description;
@@ -108,20 +107,12 @@ std::vector<NiPoint3> PropertyManagementComponent::GetPaths() const {
 
 	std::vector<float> points;
 
-	std::istringstream stream(result.getStringField("path"));
-	std::string token;
-
-	while (std::getline(stream, token, ' ')) {
-		try {
-			auto value = std::stof(token);
-
-			points.push_back(value);
-		} catch (std::invalid_argument& exception) {
-			LOG("Failed to parse value (%s): (%s)!", token.c_str(), exception.what());
-		}
+	for (const auto& str : GeneralUtils::SplitString(result.getStringField("path"), ' ')) {
+		const auto value = GeneralUtils::TryParse<float>(str);
+		if (value) points.push_back(value.value());
 	}
 
-	for (auto i = 0u; i < points.size(); i += 3) {
+	for (auto i = 0u; i + 2 < points.size(); i += 3) {
 		paths.emplace_back(points[i], points[i + 1], points[i + 2]);
 	}
 
@@ -171,7 +162,7 @@ void PropertyManagementComponent::UpdatePropertyDetails(std::string name, std::s
 	info.name = propertyName;
 	info.description = propertyDescription;
 	info.lastUpdatedTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-	
+
 	Database::Get()->UpdateLastSave(info);
 	Database::Get()->UpdatePropertyDetails(info);
 
@@ -204,14 +195,22 @@ bool PropertyManagementComponent::Claim(const LWOOBJID playerId) {
 
 	auto prop_path = zone->GetPath(m_Parent->GetVarAsString(u"propertyName"));
 
-	if (prop_path){
+	if (prop_path) {
 		if (!prop_path->property.displayName.empty()) name = prop_path->property.displayName;
 		description = prop_path->property.displayDesc;
 	}
 
 	SetOwnerId(playerId);
 
-	propertyId = ObjectIDManager::GenerateRandomObjectID();
+	// Due to legacy IDs being random
+	propertyId = ObjectIDManager::GetPersistentID();
+	const uint32_t maxTries = 100;
+	uint32_t tries = 0;
+	while (Database::Get()->GetPropertyInfo(propertyId) && tries < maxTries) {
+		tries++;
+		LOG("Found a duplicate property %llu, getting a new propertyId", propertyId);
+		propertyId = ObjectIDManager::GetPersistentID();
+	}
 
 	IProperty::Info info;
 	info.id = propertyId;
@@ -333,7 +332,7 @@ void PropertyManagementComponent::UpdateModelPosition(const LWOOBJID id, const N
 
 	const auto modelLOT = item->GetLot();
 
-	if (rotation != NiQuaternionConstant::IDENTITY) {
+	if (rotation != QuatUtils::IDENTITY) {
 		rotation = { rotation.w, rotation.z, rotation.y, rotation.x };
 	}
 
@@ -347,10 +346,7 @@ void PropertyManagementComponent::UpdateModelPosition(const LWOOBJID id, const N
 		info.spawner = nullptr;
 		info.spawnerID = spawnerID;
 		info.spawnerNodeID = 0;
-
-		for (auto* setting : item->GetConfig()) {
-			info.settings.push_back(setting->Copy());
-		}
+		info.settings = item->GetConfig();
 
 		Entity* newEntity = Game::entityManager->CreateEntity(info);
 		if (newEntity != nullptr) {
@@ -375,46 +371,45 @@ void PropertyManagementComponent::UpdateModelPosition(const LWOOBJID id, const N
 	node->position = position;
 	node->rotation = rotation;
 
-	ObjectIDManager::RequestPersistentID([this, node, modelLOT, entity, position, rotation, originalRotation](uint32_t persistentId) {
-		SpawnerInfo info{};
+	SpawnerInfo info{};
 
-		info.templateID = modelLOT;
-		info.nodes = { node };
-		info.templateScale = 1.0f;
-		info.activeOnLoad = true;
-		info.amountMaintained = 1;
-		info.respawnTime = 10;
+	info.templateID = modelLOT;
+	info.nodes = { node };
+	info.templateScale = 1.0f;
+	info.activeOnLoad = true;
+	info.amountMaintained = 1;
+	info.respawnTime = 10;
 
-		info.emulated = true;
-		info.emulator = Game::entityManager->GetZoneControlEntity()->GetObjectID();
+	info.emulated = true;
+	info.emulator = Game::entityManager->GetZoneControlEntity()->GetObjectID();
 
-		info.spawnerID = persistentId;
-		GeneralUtils::SetBit(info.spawnerID, eObjectBits::CLIENT);
+	info.spawnerID = ObjectIDManager::GetPersistentID();
+	GeneralUtils::SetBit(info.spawnerID, eObjectBits::CLIENT);
 
-		const auto spawnerId = Game::zoneManager->MakeSpawner(info);
+	const auto spawnerId = Game::zoneManager->MakeSpawner(info);
 
-		auto* spawner = Game::zoneManager->GetSpawner(spawnerId);
+	auto* spawner = Game::zoneManager->GetSpawner(spawnerId);
 
-		info.nodes[0]->config.push_back(new LDFData<LWOOBJID>(u"modelBehaviors", 0));
-		info.nodes[0]->config.push_back(new LDFData<LWOOBJID>(u"userModelID", info.spawnerID));
-		info.nodes[0]->config.push_back(new LDFData<int>(u"modelType", 2));
-		info.nodes[0]->config.push_back(new LDFData<bool>(u"propertyObjectID", true));
-		info.nodes[0]->config.push_back(new LDFData<int>(u"componentWhitelist", 1));
+	info.nodes[0]->config.Insert<LWOOBJID>(u"modelBehaviors", 0);
+	info.nodes[0]->config.Insert<LWOOBJID>(u"userModelID", info.spawnerID);
+	info.nodes[0]->config.Insert<int>(u"modelType", 2);
+	info.nodes[0]->config.Insert<bool>(u"propertyObjectID", true);
+	info.nodes[0]->config.Insert<int>(u"componentWhitelist", 1);
 
-		auto* model = spawner->Spawn();
-		auto* modelComponent = model->GetComponent<ModelComponent>();
-		if (modelComponent) modelComponent->Pause();
+	auto* model = spawner->Spawn();
+	auto* modelComponent = model->GetComponent<ModelComponent>();
+	if (modelComponent) modelComponent->Pause();
 
-		models.insert_or_assign(model->GetObjectID(), spawnerId);
+	models.insert_or_assign(model->GetObjectID(), spawnerId);
 
-		GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), position, m_Parent->GetObjectID(), 14, originalRotation);
+	GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), position, m_Parent->GetObjectID(), 14, originalRotation);
 
-		GameMessages::SendUGCEquipPreCreateBasedOnEditMode(entity->GetObjectID(), entity->GetSystemAddress(), 0, spawnerId);
+	GameMessages::SendUGCEquipPreCreateBasedOnEditMode(entity->GetObjectID(), entity->GetSystemAddress(), 0, spawnerId);
 
-		GameMessages::SendGetModelsOnProperty(entity->GetObjectID(), GetModels(), UNASSIGNED_SYSTEM_ADDRESS);
+	GameMessages::SendGetModelsOnProperty(entity->GetObjectID(), GetModels(), UNASSIGNED_SYSTEM_ADDRESS);
 
-		Game::entityManager->GetZoneControlEntity()->OnZonePropertyModelPlaced(entity);
-		});
+	Game::entityManager->GetZoneControlEntity()->OnZonePropertyModelPlaced(entity);
+
 	// Progress place model missions
 	auto missionComponent = entity->GetComponent<MissionComponent>();
 	if (missionComponent != nullptr) missionComponent->Progress(eMissionTaskType::PLACE_MODEL, 0);
@@ -478,28 +473,19 @@ void PropertyManagementComponent::DeleteModel(const LWOOBJID id, const int delet
 
 	if (model->GetLOT() == 14) {
 		//add it to the inv
-		std::vector<LDFBaseData*> settings;
-
+		LwoNameValue actualConfig;
+	
 		//fill our settings with BBB gurbage
-		LDFBaseData* ldfBlueprintID = new LDFData<LWOOBJID>(u"blueprintid", model->GetVar<LWOOBJID>(u"blueprintid"));
-		LDFBaseData* userModelDesc = new LDFData<std::u16string>(u"userModelDesc", u"A cool model you made!");
-		LDFBaseData* userModelHasBhvr = new LDFData<bool>(u"userModelHasBhvr", false);
-		LDFBaseData* userModelID = new LDFData<LWOOBJID>(u"userModelID", model->GetVar<LWOOBJID>(u"userModelID"));
-		LDFBaseData* userModelMod = new LDFData<bool>(u"userModelMod", false);
-		LDFBaseData* userModelName = new LDFData<std::u16string>(u"userModelName", u"My Cool Model");
-		LDFBaseData* propertyObjectID = new LDFData<bool>(u"userModelOpt", true);
-		LDFBaseData* modelType = new LDFData<int>(u"userModelPhysicsType", 2);
+		actualConfig.Insert(u"blueprintid", model->GetVar<LWOOBJID>(u"blueprintid"));
+		actualConfig.Insert(u"userModelDesc", u"A cool model you made!");
+		actualConfig.Insert(u"userModelHasBhvr", false);
+		actualConfig.Insert(u"userModelID", model->GetVar<LWOOBJID>(u"userModelID"));
+		actualConfig.Insert(u"userModelMod", false);
+		actualConfig.Insert(u"userModelName", u"My Cool Model");
+		actualConfig.Insert(u"userModelOpt", true);
+		actualConfig.Insert(u"userModelPhysicsType", 2);
 
-		settings.push_back(ldfBlueprintID);
-		settings.push_back(userModelDesc);
-		settings.push_back(userModelHasBhvr);
-		settings.push_back(userModelID);
-		settings.push_back(userModelMod);
-		settings.push_back(userModelName);
-		settings.push_back(propertyObjectID);
-		settings.push_back(modelType);
-
-		inventoryComponent->AddItem(6662, 1, eLootSourceType::DELETION, eInventoryType::MODELS_IN_BBB, settings, LWOOBJID_EMPTY, false, false, spawnerId);
+		inventoryComponent->AddItem(6662, 1, eLootSourceType::DELETION, eInventoryType::MODELS_IN_BBB, actualConfig, LWOOBJID_EMPTY, false, false, spawnerId);
 		auto* item = inventoryComponent->FindItemBySubKey(spawnerId);
 
 		if (item == nullptr) {
@@ -516,7 +502,7 @@ void PropertyManagementComponent::DeleteModel(const LWOOBJID id, const int delet
 
 		GameMessages::SendGetModelsOnProperty(entity->GetObjectID(), GetModels(), UNASSIGNED_SYSTEM_ADDRESS);
 
-		GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), NiPoint3Constant::ZERO, LWOOBJID_EMPTY, 16, NiQuaternionConstant::IDENTITY);
+		GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), NiPoint3Constant::ZERO, LWOOBJID_EMPTY, 16, QuatUtils::IDENTITY);
 
 		if (spawner != nullptr) {
 			Game::zoneManager->RemoveSpawner(spawner->m_Info.spawnerID);
@@ -569,7 +555,7 @@ void PropertyManagementComponent::DeleteModel(const LWOOBJID id, const int delet
 
 	GameMessages::SendGetModelsOnProperty(entity->GetObjectID(), GetModels(), UNASSIGNED_SYSTEM_ADDRESS);
 
-	GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), NiPoint3Constant::ZERO, LWOOBJID_EMPTY, 16, NiQuaternionConstant::IDENTITY);
+	GameMessages::SendPlaceModelResponse(entity->GetObjectID(), entity->GetSystemAddress(), NiPoint3Constant::ZERO, LWOOBJID_EMPTY, 16, QuatUtils::IDENTITY);
 
 	if (spawner != nullptr) {
 		Game::zoneManager->RemoveSpawner(spawner->m_Info.spawnerID);
@@ -617,25 +603,23 @@ void PropertyManagementComponent::Load() {
 
 		info.spawnerID = databaseModel.id;
 
-		std::vector<LDFBaseData*> settings;
+		LwoNameValue& settings = node->config;
 
 		//BBB property models need to have extra stuff set for them:
 		if (databaseModel.lot == 14) {
 			LWOOBJID blueprintID = databaseModel.ugcId;
-			GeneralUtils::SetBit(blueprintID, eObjectBits::CHARACTER);
-			GeneralUtils::SetBit(blueprintID, eObjectBits::PERSISTENT);
 
-			settings.push_back(new LDFData<LWOOBJID>(u"blueprintid", blueprintID));
-			settings.push_back(new LDFData<int>(u"componentWhitelist", 1));
-			settings.push_back(new LDFData<int>(u"modelType", 2));
-			settings.push_back(new LDFData<bool>(u"propertyObjectID", true));
-			settings.push_back(new LDFData<LWOOBJID>(u"userModelID", databaseModel.id));
+			settings.Insert<LWOOBJID>(u"blueprintid", blueprintID);
+			settings.Insert<int>(u"componentWhitelist", 1);
+			settings.Insert<int>(u"modelType", 2);
+			settings.Insert<bool>(u"propertyObjectID", true);
+			settings.Insert<LWOOBJID>(u"userModelID", databaseModel.id);
 		} else {
-			settings.push_back(new LDFData<int>(u"modelType", 2));
-			settings.push_back(new LDFData<LWOOBJID>(u"userModelID", databaseModel.id));
-			settings.push_back(new LDFData<LWOOBJID>(u"modelBehaviors", 0));
-			settings.push_back(new LDFData<bool>(u"propertyObjectID", true));
-			settings.push_back(new LDFData<int>(u"componentWhitelist", 1));
+			settings.Insert<int>(u"modelType", 2);
+			settings.Insert<LWOOBJID>(u"userModelID", databaseModel.id);
+			settings.Insert<LWOOBJID>(u"modelBehaviors", 0);
+			settings.Insert<bool>(u"propertyObjectID", true);
+			settings.Insert<int>(u"componentWhitelist", 1);
 		}
 
 		std::ostringstream userModelBehavior;
@@ -650,9 +634,7 @@ void PropertyManagementComponent::Load() {
 			firstAdded = true;
 		}
 
-		settings.push_back(new LDFData<std::string>(u"userModelBehaviors", userModelBehavior.str()));
-
-		node->config = settings;
+		settings.Insert<std::string>(u"userModelBehaviors", userModelBehavior.str());
 
 		const auto spawnerId = Game::zoneManager->MakeSpawner(info);
 
@@ -696,7 +678,7 @@ void PropertyManagementComponent::Save() {
 		// save the behaviors of the model
 		for (const auto& [behaviorId, behaviorStr] : modelBehaviors) {
 			if (behaviorStr.empty() || behaviorId == -1 || behaviorId == 0) continue;
-			IBehaviors::Info info {
+			IBehaviors::Info info{
 				.behaviorId = behaviorId,
 				.characterId = character->GetID(),
 				.behaviorInfo = behaviorStr
@@ -776,15 +758,17 @@ void PropertyManagementComponent::OnQueryPropertyData(Entity* originator, const 
 		privacy = static_cast<char>(this->privacyOption);
 		if (moderatorRequested) {
 			auto moderationInfo = Database::Get()->GetPropertyInfo(zoneId, cloneId);
-			if (moderationInfo->rejectionReason != "") {
-				moderatorRequested = false;
-				rejectionReason = moderationInfo->rejectionReason;
-			} else if (moderationInfo->rejectionReason == "" && moderationInfo->modApproved == 1) {
-				moderatorRequested = false;
-				rejectionReason = "";
-			} else {
-				moderatorRequested = true;
-				rejectionReason = "";
+			if (moderationInfo) {
+				if (moderationInfo->rejectionReason != "") {
+					moderatorRequested = false;
+					rejectionReason = moderationInfo->rejectionReason;
+				} else if (moderationInfo->rejectionReason == "" && moderationInfo->modApproved == 1) {
+					moderatorRequested = false;
+					rejectionReason = "";
+				} else {
+					moderatorRequested = true;
+					rejectionReason = "";
+				}
 			}
 		}
 	}
@@ -824,7 +808,7 @@ void PropertyManagementComponent::OnChatMessageReceived(const std::string& sMess
 		if (!model) continue;
 		auto* const modelComponent = model->GetComponent<ModelComponent>();
 		if (!modelComponent) continue;
-		
+
 		modelComponent->OnChatMessageReceived(sMessage);
 	}
 }

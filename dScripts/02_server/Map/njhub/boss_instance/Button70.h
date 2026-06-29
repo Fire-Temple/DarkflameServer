@@ -15,6 +15,6 @@ public:
 
 private:
 
-	int IsInMovement;
+	bool isInMovement;
 };
 

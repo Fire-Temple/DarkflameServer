@@ -17,7 +17,9 @@
 #include "EntityManager.h"
 #include "MovementAIComponent.h"
 
-TriggerComponent::TriggerComponent(Entity* parent, const std::string triggerInfo) : Component(parent) {
+#include <glm/gtc/quaternion.hpp>
+
+TriggerComponent::TriggerComponent(Entity* parent, const int32_t componentID, const std::string triggerInfo) : Component(parent, componentID) {
 	m_Parent = parent;
 	m_Trigger = nullptr;
 
@@ -240,10 +242,9 @@ void TriggerComponent::HandleMoveObject(Entity* targetEntity, std::vector<std::s
 void TriggerComponent::HandleRotateObject(Entity* targetEntity, std::vector<std::string> argArray) {
 	if (argArray.size() <= 2) return;
 
-	const NiPoint3 vector = GeneralUtils::TryParse<NiPoint3>(argArray).value_or(NiPoint3Constant::ZERO);
+	const auto vector = GeneralUtils::TryParse<glm::vec3>(argArray).value_or(glm::zero<glm::vec3>());
 
-	NiQuaternion rotation = NiQuaternion::FromEulerAngles(vector);
-	targetEntity->SetRotation(rotation);
+	targetEntity->SetRotation(glm::quat(vector));
 }
 
 void TriggerComponent::HandlePushObject(Entity* targetEntity, std::vector<std::string> argArray) {
@@ -384,26 +385,30 @@ void TriggerComponent::HandleSetPhysicsVolumeEffect(Entity* targetEntity, std::v
 	}
 	phantomPhysicsComponent->SetPhysicsEffectActive(true);
 	ePhysicsEffectType effectType = ePhysicsEffectType::PUSH;
-	std::transform(argArray.at(0).begin(), argArray.at(0).end(), argArray.at(0).begin(), ::tolower); //Transform to lowercase
-	if (argArray.at(0) == "push") effectType = ePhysicsEffectType::PUSH;
-	else if (argArray.at(0) == "attract") effectType = ePhysicsEffectType::ATTRACT;
-	else if (argArray.at(0) == "repulse") effectType = ePhysicsEffectType::REPULSE;
-	else if (argArray.at(0) == "gravity") effectType = ePhysicsEffectType::GRAVITY_SCALE;
-	else if (argArray.at(0) == "friction") effectType = ePhysicsEffectType::FRICTION;
+	if (!argArray.empty()) {
+		std::transform(argArray.at(0).begin(), argArray.at(0).end(), argArray.at(0).begin(), ::tolower); //Transform to lowercase
+		if (argArray.at(0) == "push") effectType = ePhysicsEffectType::PUSH;
+		else if (argArray.at(0) == "attract") effectType = ePhysicsEffectType::ATTRACT;
+		else if (argArray.at(0) == "repulse") effectType = ePhysicsEffectType::REPULSE;
+		else if (argArray.at(0) == "gravity") effectType = ePhysicsEffectType::GRAVITY_SCALE;
+		else if (argArray.at(0) == "friction") effectType = ePhysicsEffectType::FRICTION;
+	}
 
 	phantomPhysicsComponent->SetEffectType(effectType);
-	phantomPhysicsComponent->SetDirectionalMultiplier(std::stof(argArray.at(1)));
+	if (argArray.size() > 1) {
+		phantomPhysicsComponent->SetDirectionalMultiplier(GeneralUtils::TryParse(argArray.at(1), 0.0f));
+	}
 	if (argArray.size() > 4) {
 		const NiPoint3 direction =
-			GeneralUtils::TryParse<NiPoint3>(argArray.at(2), argArray.at(3), argArray.at(4)).value_or(NiPoint3Constant::ZERO);
+			GeneralUtils::TryParse(argArray.at(2), argArray.at(3), argArray.at(4), NiPoint3Constant::ZERO);
 
 		phantomPhysicsComponent->SetDirection(direction);
 	}
-	if (argArray.size() > 5) {
-		const uint32_t min = GeneralUtils::TryParse<uint32_t>(argArray.at(6)).value_or(0);
+	if (argArray.size() > 6) {
+		const uint32_t min = GeneralUtils::TryParse(argArray.at(6), 0);
 		phantomPhysicsComponent->SetMin(min);
 
-		const uint32_t max = GeneralUtils::TryParse<uint32_t>(argArray.at(7)).value_or(0);
+		const uint32_t max = GeneralUtils::TryParse(argArray.at(7), 0);
 		phantomPhysicsComponent->SetMax(max);
 	}
 

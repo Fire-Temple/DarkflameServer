@@ -9,12 +9,9 @@
 #include "NiQuaternion.h"
 #include "BitStream.h"
 #include <vector>
-#include "CppScripts.h"
-#include "InvalidScript.h"
 #include "eReplicaComponentType.h"
 #include "PhysicsComponent.h"
 
-class LDFBaseData;
 class Entity;
 class dpEntity;
 enum class ePhysicsEffectType : uint32_t ;
@@ -30,7 +27,7 @@ class PhantomPhysicsComponent final : public PhysicsComponent {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::PHANTOM_PHYSICS;
 
-	PhantomPhysicsComponent(Entity* parent, int32_t componentId);
+	PhantomPhysicsComponent(Entity* parent, const int32_t componentID);
 	~PhantomPhysicsComponent() override;
 	void Update(float deltaTime) override;
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
@@ -118,6 +115,8 @@ public:
 	void SetMax(uint32_t max);
 
 private:
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
+
 	/**
 	 * A scale to apply to the size of the physics object
 	 */
@@ -175,5 +174,5 @@ private:
 	/**
 	 * If this is a respawn volume, the exact rotation an entity will respawn
 	 */
-	NiQuaternion m_RespawnRot;
+	NiQuaternion m_RespawnRot = QuatUtils::IDENTITY;
 };

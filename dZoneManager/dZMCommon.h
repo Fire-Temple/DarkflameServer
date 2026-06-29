@@ -11,11 +11,10 @@ struct SceneObject {
 	uint32_t nodeType;
 	uint32_t glomId;
 	NiPoint3 position;
-	NiQuaternion rotation;
+	NiQuaternion rotation = QuatUtils::IDENTITY;
 	float scale = 1.0f;
-	//std::string settings;
 	uint32_t value3;
-	std::vector<LDFBaseData*> settings;
+	LwoNameValue settings;
 };
 
 #define LOT_MARKER_PLAYER_START 1931

@@ -10,14 +10,14 @@
 #include "BitStream.h"
 #include "BitStreamUtils.h"
 #include "MessageType/Client.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 
 #pragma warning (disable:4251) //Disables SQL warnings
 
 // These are the same define, but they mean two different things in different contexts
 // so a different define to distinguish what calculation is happening will help clarity.
-#define FRAMES_TO_MS(x) 1000 / x
-#define MS_TO_FRAMES(x) 1000 / x
+#define FRAMES_TO_MS(x) (1000 / (x))
+#define MS_TO_FRAMES(x) (1000 / (x))
 
 //=========== FRAME TIMINGS ===========
 constexpr uint32_t highFramerate = 60;
@@ -34,7 +34,7 @@ constexpr uint32_t lowFrameDelta = FRAMES_TO_MS(lowFramerate);
 #define CBITSTREAM RakNet::BitStream bitStream;
 #define CINSTREAM RakNet::BitStream inStream(packet->data, packet->length, false);
 #define CINSTREAM_SKIP_HEADER CINSTREAM if (inStream.GetNumberOfUnreadBits() >= BYTES_TO_BITS(HEADER_SIZE)) inStream.IgnoreBytes(HEADER_SIZE); else inStream.IgnoreBits(inStream.GetNumberOfUnreadBits());
-#define CMSGHEADER BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+#define CMSGHEADER BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 #define SEND_PACKET Game::server->Send(bitStream, sysAddr, false);
 #define SEND_PACKET_BROADCAST Game::server->Send(bitStream, UNASSIGNED_SYSTEM_ADDRESS, true);
 
@@ -58,6 +58,7 @@ constexpr LWOCLONEID LWOCLONEID_INVALID = -1;     	//!< Invalid LWOCLONEID
 constexpr LWOINSTANCEID LWOINSTANCEID_INVALID = -1; //!< Invalid LWOINSTANCEID
 constexpr LWOMAPID LWOMAPID_INVALID = -1;       	//!< Invalid LWOMAPID
 constexpr uint64_t LWOZONEID_INVALID = 0;       	//!< Invalid LWOZONEID
+constexpr uint32_t MAX_MESSAGE_LENGTH = 0x500000;   //!< Prevent exceptionally large msgs from being processed. Should always be used to check user provided inputs.
 
 constexpr float PI = 3.14159f;
 
@@ -109,18 +110,6 @@ private:
 };
 
 constexpr LWOSCENEID LWOSCENEID_INVALID = -1;
-
-struct LWONameValue {
-	uint32_t length = 0;        //!< The length of the name
-	std::u16string name;			//!< The name
-
-	LWONameValue() = default;
-
-	LWONameValue(const std::u16string& name) {
-		this->name = name;
-		this->length = static_cast<uint32_t>(name.length());
-	}
-};
 
 struct FriendData {
 public:

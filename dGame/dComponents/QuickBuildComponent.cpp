@@ -22,8 +22,12 @@
 #include "RenderComponent.h"
 
 #include "CppScripts.h"
+#include "StringifiedEnum.h"
+#include "Amf3.h"
 
-QuickBuildComponent::QuickBuildComponent(Entity* const entity) : Component{ entity } {
+#include <limits>
+
+QuickBuildComponent::QuickBuildComponent(Entity* const entity, const int32_t componentID) : Component{ entity, componentID } {
 	std::u16string checkPreconditions = entity->GetVar<std::u16string>(u"CheckPrecondition");
 
 	if (!checkPreconditions.empty()) {
@@ -42,6 +46,7 @@ QuickBuildComponent::QuickBuildComponent(Entity* const entity) : Component{ enti
 	}
 
 	SpawnActivator();
+	RegisterMsg(&QuickBuildComponent::OnGetObjectReportInfo);
 }
 
 QuickBuildComponent::~QuickBuildComponent() {
@@ -329,7 +334,12 @@ void QuickBuildComponent::SetActivatorPosition(const NiPoint3& value) noexcept {
 }
 
 void QuickBuildComponent::SetResetTime(const float value) noexcept {
-	m_ResetTime = value;
+	if (value < 0) {
+		// easy fix to never reset :)
+		m_ResetTime = std::numeric_limits<float>::max();
+	} else {
+		m_ResetTime = value;
+	}
 }
 
 void QuickBuildComponent::SetCompleteTime(const float value) noexcept {
@@ -366,7 +376,8 @@ void QuickBuildComponent::SetPostImaginationCost(const int32_t value) noexcept {
 
 void QuickBuildComponent::SetTimeBeforeSmash(const float value) noexcept {
 	if (value < 0) {
-		m_TimeBeforeSmash = 10.0f;
+		// easy fix to never reset :)
+		m_TimeBeforeSmash = std::numeric_limits<float>::max();
 	} else {
 		m_TimeBeforeSmash = value;
 	}
@@ -381,7 +392,7 @@ void QuickBuildComponent::StartQuickBuild(Entity* const user) {
 		m_Builder = user->GetObjectID();
 
 		auto* character = user->GetComponent<CharacterComponent>();
-		character->SetCurrentActivity(eGameActivity::QUICKBUILDING);
+		if (character) character->SetCurrentActivity(eGameActivity::QUICKBUILDING);
 
 		Game::entityManager->SerializeEntity(user);
 
@@ -568,4 +579,31 @@ void QuickBuildComponent::AddQuickBuildCompleteCallback(const std::function<void
 
 void QuickBuildComponent::AddQuickBuildStateCallback(const std::function<void(eQuickBuildState state)>& callback) {
 	m_QuickBuildStateCallbacks.push_back(callback);
+}
+
+bool QuickBuildComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {
+	auto& quickbuild = reportInfo.info->PushDebug("Quick Build");
+	quickbuild.PushDebug<AMFStringValue>("State") = StringifiedEnum::ToString(m_State).data();
+	quickbuild.PushDebug<AMFDoubleValue>("Timer") = m_Timer;
+	quickbuild.PushDebug<AMFDoubleValue>("TimerIncomplete") = m_TimerIncomplete;
+	quickbuild.PushDebug("ActivatorPosition").PushDebug(m_ActivatorPosition);
+	quickbuild.PushDebug<AMFStringValue>("ActivatorId") = std::to_string(m_ActivatorId);
+	quickbuild.PushDebug<AMFBoolValue>("ShowResetEffect") = m_ShowResetEffect;
+	quickbuild.PushDebug<AMFDoubleValue>("Taken") = m_Taken;
+	quickbuild.PushDebug<AMFDoubleValue>("ResetTime") = m_ResetTime;
+	quickbuild.PushDebug<AMFDoubleValue>("CompleteTime") = m_CompleteTime;
+	quickbuild.PushDebug<AMFIntValue>("TakeImagination") = m_TakeImagination;
+	quickbuild.PushDebug<AMFBoolValue>("Interruptible") = m_Interruptible;
+	quickbuild.PushDebug<AMFBoolValue>("SelfActivator") = m_SelfActivator;
+	auto& modules = quickbuild.PushDebug("CustomModules");
+	for (const auto cmodule : m_CustomModules) modules.PushDebug<AMFIntValue>("Module") = cmodule;
+	quickbuild.PushDebug<AMFIntValue>("ActivityId") = m_ActivityId;
+	quickbuild.PushDebug<AMFIntValue>("PostImaginationCost") = m_PostImaginationCost;
+	quickbuild.PushDebug<AMFDoubleValue>("TimeBeforeSmash") = m_TimeBeforeSmash;
+	quickbuild.PushDebug<AMFDoubleValue>("TimeBeforeDrain") = m_TimeBeforeDrain;
+	quickbuild.PushDebug<AMFIntValue>("DrainedImagination") = m_DrainedImagination;
+	quickbuild.PushDebug<AMFBoolValue>("RepositionPlayer") = m_RepositionPlayer;
+	quickbuild.PushDebug<AMFDoubleValue>("SoftTimer") = m_SoftTimer;
+	quickbuild.PushDebug<AMFStringValue>("Builder") = std::to_string(m_Builder);
+	return true;
 }

@@ -14,7 +14,7 @@
 #include "dConfig.h"
 #include "dpWorld.h"
 #include "dZoneManager.h"
-#include "Metrics.hpp"
+#include "Metrics.h"
 #include "PerformanceManager.h"
 #include "Diagnostics.h"
 #include "BinaryPathFinder.h"
@@ -35,7 +35,6 @@
 #include "CDClientManager.h"
 #include "CDClientDatabase.h"
 #include "GeneralUtils.h"
-#include "ObjectIDManager.h"
 #include "ZoneInstanceManager.h"
 #include "dChatFilter.h"
 #include "ClientPackets.h"
@@ -65,7 +64,7 @@
 #include "NiPoint3.h"
 #include "eServerDisconnectIdentifiers.h"
 #include "eObjectBits.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Server.h"
 #include "MessageType/Chat.h"
 #include "MessageType/World.h"
@@ -83,6 +82,7 @@
 #include "MissionComponent.h"
 #include "SlashCommandHandler.h"
 #include "InventoryComponent.h"
+#include "Item.h"
 
 namespace Game {
 	Logger* logger = nullptr;
@@ -160,6 +160,7 @@ int main(int argc, char** argv) {
 	//Create all the objects we need to run our service:
 	Server::SetupLogger("WorldServer_" + std::to_string(zoneID) + "_" + std::to_string(g_InstanceID));
 	if (!Game::logger) return EXIT_FAILURE;
+	Game::config->LogSettings();
 
 	LOG("Starting World server...");
 	LOG("Version: %s", Game::projectVersion.c_str());
@@ -236,7 +237,7 @@ int main(int argc, char** argv) {
 		Game::logger,
 		masterIP,
 		masterPort,
-		ServerType::World,
+		ServiceType::WORLD,
 		Game::config,
 		&Game::lastSignal,
 		masterPassword,
@@ -555,7 +556,7 @@ void HandlePacketChat(Packet* packet) {
 	}
 
 	if (packet->data[0] == ID_USER_PACKET_ENUM && packet->length >= 4) {
-		if (static_cast<eConnectionType>(packet->data[1]) == eConnectionType::CHAT) {
+		if (static_cast<ServiceType>(packet->data[1]) == ServiceType::CHAT) {
 			switch (static_cast<MessageType::Chat>(packet->data[3])) {
 			case MessageType::Chat::WORLD_ROUTE_PACKET: {
 				CINSTREAM_SKIP_HEADER;
@@ -673,17 +674,8 @@ void HandlePacketChat(Packet* packet) {
 
 void HandleMasterPacket(Packet* packet) {
 	if (packet->length < 2) return;
-	if (static_cast<eConnectionType>(packet->data[1]) != eConnectionType::MASTER || packet->length < 4) return;
+	if (static_cast<ServiceType>(packet->data[1]) != ServiceType::MASTER || packet->length < 4) return;
 	switch (static_cast<MessageType::Master>(packet->data[3])) {
-	case MessageType::Master::REQUEST_PERSISTENT_ID_RESPONSE: {
-		CINSTREAM_SKIP_HEADER;
-		uint64_t requestID;
-		inStream.Read(requestID);
-		uint32_t objectID;
-		inStream.Read(objectID);
-		ObjectIDManager::HandleRequestPersistentIDResponse(requestID, objectID);
-		break;
-	}
 
 	case MessageType::Master::SESSION_KEY_RESPONSE: {
 		//Read our session key and to which user it belongs:
@@ -740,7 +732,7 @@ void HandleMasterPacket(Packet* packet) {
 			//Notify master:
 			{
 				CBITSTREAM;
-				BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::PLAYER_ADDED);
+				BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::PLAYER_ADDED);
 				bitStream.Write<LWOMAPID>(Game::server->GetZoneID());
 				bitStream.Write<LWOINSTANCEID>(g_InstanceID);
 				Game::server->SendToMaster(bitStream);
@@ -757,7 +749,7 @@ void HandleMasterPacket(Packet* packet) {
 
 		CBITSTREAM;
 
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::AFFIRM_TRANSFER_RESPONSE);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::AFFIRM_TRANSFER_RESPONSE);
 		bitStream.Write(requestID);
 		Game::server->SendToMaster(bitStream);
 
@@ -834,7 +826,7 @@ void HandlePacket(Packet* packet) {
 
 		{
 			CBITSTREAM;
-			BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
+			BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
 			bitStream.Write(user->GetLoggedInChar());
 			Game::chatServer->Send(&bitStream, SYSTEM_PRIORITY, RELIABLE, 0, Game::chatSysAddr, false);
 		}
@@ -846,7 +838,7 @@ void HandlePacket(Packet* packet) {
 		}
 
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::PLAYER_REMOVED);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::PLAYER_REMOVED);
 		bitStream.Write<LWOMAPID>(Game::server->GetZoneID());
 		bitStream.Write<LWOINSTANCEID>(g_InstanceID);
 		Game::server->SendToMaster(bitStream);
@@ -858,14 +850,14 @@ void HandlePacket(Packet* packet) {
 	LUBitStream luBitStream;
 	luBitStream.ReadHeader(inStream);
 
-	if (luBitStream.connectionType == eConnectionType::SERVER) {
+	if (luBitStream.connectionType == ServiceType::COMMON) {
 		if (static_cast<MessageType::Server>(luBitStream.internalPacketID) == MessageType::Server::VERSION_CONFIRM) {
 			AuthPackets::HandleHandshake(Game::server, packet);
 		}
 	}
 
-	if (luBitStream.connectionType != eConnectionType::WORLD) return;
-
+	if (luBitStream.connectionType != ServiceType::WORLD) return;
+	LOG_DEBUG("Got world packet %s", StringifiedEnum::ToString(static_cast<MessageType::World>(luBitStream.internalPacketID)).data());
 	switch (static_cast<MessageType::World>(luBitStream.internalPacketID)) {
 	case MessageType::World::VALIDATION: {
 		CINSTREAM_SKIP_HEADER;
@@ -915,7 +907,7 @@ void HandlePacket(Packet* packet) {
 
 		//Request the session info from Master:
 		CBITSTREAM;
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::REQUEST_SESSION_KEY);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::REQUEST_SESSION_KEY);
 		bitStream.Write(username);
 		Game::server->SendToMaster(bitStream);
 
@@ -987,7 +979,7 @@ void HandlePacket(Packet* packet) {
 
 		LWOOBJID playerID = 0;
 		inStream.Read(playerID);
-
+		LOG("User is requesting to login with character %llu", playerID);
 		bool valid = CheatDetection::VerifyLwoobjidIsSender(
 			playerID,
 			packet->systemAddress,
@@ -995,26 +987,23 @@ void HandlePacket(Packet* packet) {
 			"Sending login request with a sending player that does not match their own. Player ID: %llu",
 			playerID
 		);
-
+		LOG("Login request for player %llu is %s", playerID, valid ? "valid" : "invalid");
 		if (!valid) return;
-
-		GeneralUtils::ClearBit(playerID, eObjectBits::CHARACTER);
-		GeneralUtils::ClearBit(playerID, eObjectBits::PERSISTENT);
 
 		auto user = UserManager::Instance()->GetUser(packet->systemAddress);
 
 		if (user) {
 			auto lastCharacter = user->GetLoggedInChar();
 			// This means we swapped characters and we need to remove the previous player from the container.
-			if (static_cast<uint32_t>(lastCharacter) != playerID) {
+			if (lastCharacter != playerID) {
 				CBITSTREAM;
-				BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
+				BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::UNEXPECTED_DISCONNECT);
 				bitStream.Write(lastCharacter);
 				Game::chatServer->Send(&bitStream, SYSTEM_PRIORITY, RELIABLE, 0, Game::chatSysAddr, false);
 			}
 		}
 
-		UserManager::Instance()->LoginCharacter(packet->systemAddress, static_cast<uint32_t>(playerID));
+		UserManager::Instance()->LoginCharacter(packet->systemAddress, playerID);
 		break;
 	}
 
@@ -1034,6 +1023,7 @@ void HandlePacket(Packet* packet) {
 		if (user) {
 			Character* c = user->GetLastUsedChar();
 			if (c != nullptr) {
+				if (Game::entityManager->GetEntity(c->GetObjectID())) return;
 				std::u16string username = GeneralUtils::ASCIIToUTF16(c->GetName());
 				Game::server->GetReplicaManager()->AddParticipant(packet->systemAddress);
 
@@ -1044,21 +1034,6 @@ void HandlePacket(Packet* packet) {
 				auto* characterComponent = player->GetComponent<CharacterComponent>();
 				if (!characterComponent) return;
 
-				WorldPackets::SendCreateCharacter(packet->systemAddress, player->GetComponent<CharacterComponent>()->GetReputation(), player->GetObjectID(), c->GetXMLData(), username, c->GetGMLevel());
-				WorldPackets::SendServerState(packet->systemAddress);
-
-				const auto respawnPoint = player->GetCharacter()->GetRespawnPoint(Game::zoneManager->GetZone()->GetWorldID());
-
-				Game::entityManager->ConstructEntity(player, UNASSIGNED_SYSTEM_ADDRESS);
-
-				if (respawnPoint != NiPoint3Constant::ZERO) {
-					GameMessages::SendPlayerReachedRespawnCheckpoint(player, respawnPoint, NiQuaternionConstant::IDENTITY);
-				}
-
-				Game::entityManager->ConstructAllEntities(packet->systemAddress);
-
-				characterComponent->RocketUnEquip(player);
-
 				// Do charxml fixes here
 				auto* levelComponent = player->GetComponent<LevelProgressionComponent>();
 				auto* const inventoryComponent = player->GetComponent<InventoryComponent>();
@@ -1066,62 +1041,101 @@ void HandlePacket(Packet* packet) {
 				if (!levelComponent || !missionComponent || !inventoryComponent) return;
 
 				auto version = levelComponent->GetCharacterVersion();
-				switch (version) {
-				case eCharacterVersion::RELEASE:
-					// TODO: Implement, super low priority
-					[[fallthrough]];
-				case eCharacterVersion::LIVE:
-					LOG("Updating Character Flags");
-					c->SetRetroactiveFlags();
-					levelComponent->SetCharacterVersion(eCharacterVersion::PLAYER_FACTION_FLAGS);
-					[[fallthrough]];
-				case eCharacterVersion::PLAYER_FACTION_FLAGS:
-					LOG("Updating Vault Size");
-					player->RetroactiveVaultSize();
-					levelComponent->SetCharacterVersion(eCharacterVersion::VAULT_SIZE);
-					[[fallthrough]];
-				case eCharacterVersion::VAULT_SIZE:
-					LOG("Updaing Speedbase");
-					levelComponent->SetRetroactiveBaseSpeed();
-					levelComponent->SetCharacterVersion(eCharacterVersion::SPEED_BASE);
-					[[fallthrough]];
-				case eCharacterVersion::SPEED_BASE: {
-					LOG("Removing lots from NJ Jay missions bugged at foss");
-					// https://explorer.lu/missions/1789
-					const auto* mission = missionComponent->GetMission(1789);
-					if (mission && mission->IsComplete()) {
-						inventoryComponent->RemoveItem(14474, 1, eInventoryType::ITEMS);
-						inventoryComponent->RemoveItem(14474, 1, eInventoryType::VAULT_ITEMS);
-					}
-					// https://explorer.lu/missions/1927
-					mission = missionComponent->GetMission(1927);
-					if (mission && mission->IsComplete()) {
-						inventoryComponent->RemoveItem(14493, 1, eInventoryType::ITEMS);
-						inventoryComponent->RemoveItem(14493, 1, eInventoryType::VAULT_ITEMS);
-					}
-					levelComponent->SetCharacterVersion(eCharacterVersion::NJ_JAYMISSIONS);
-					[[fallthrough]];
-				}
-				case eCharacterVersion::NJ_JAYMISSIONS: {
-					LOG("Fixing Nexus Force Explorer missions");
-					auto missions = { 502 /* Pet Cove */, 593/* Nimbus Station */, 938/* Avant Gardens */, 284/* Gnarled Forest */, 754/* Forbidden Valley */ };
-					bool complete = true;
-					for (auto missionID : missions) {
-						auto* mission = missionComponent->GetMission(missionID);
-						if (!mission || !mission->IsComplete()) {
-							complete = false;
+				LOG("Updating character from version %s", StringifiedEnum::ToString(version).data());
+				if (version < eCharacterVersion::UP_TO_DATE) {
+					switch (version) {
+					case eCharacterVersion::RELEASE:
+						// TODO: Implement, super low priority
+						[[fallthrough]];
+					case eCharacterVersion::LIVE:
+						LOG("Updating Character Flags");
+						c->SetRetroactiveFlags();
+						levelComponent->SetCharacterVersion(eCharacterVersion::PLAYER_FACTION_FLAGS);
+						[[fallthrough]];
+					case eCharacterVersion::PLAYER_FACTION_FLAGS:
+						LOG("Updating Vault Size");
+						player->RetroactiveVaultSize();
+						levelComponent->SetCharacterVersion(eCharacterVersion::VAULT_SIZE);
+						[[fallthrough]];
+					case eCharacterVersion::VAULT_SIZE:
+						LOG("Updaing Speedbase");
+						levelComponent->SetRetroactiveBaseSpeed();
+						levelComponent->SetCharacterVersion(eCharacterVersion::SPEED_BASE);
+						[[fallthrough]];
+					case eCharacterVersion::SPEED_BASE: {
+						LOG("Removing lots from NJ Jay missions bugged at foss");
+						// https://explorer.lu/missions/1789
+						const auto* mission = missionComponent->GetMission(1789);
+						if (mission && mission->IsComplete()) {
+							inventoryComponent->RemoveItem(14474, 1, eInventoryType::ITEMS);
+							inventoryComponent->RemoveItem(14474, 1, eInventoryType::VAULT_ITEMS);
 						}
+						// https://explorer.lu/missions/1927
+						mission = missionComponent->GetMission(1927);
+						if (mission && mission->IsComplete()) {
+							inventoryComponent->RemoveItem(14493, 1, eInventoryType::ITEMS);
+							inventoryComponent->RemoveItem(14493, 1, eInventoryType::VAULT_ITEMS);
+						}
+						levelComponent->SetCharacterVersion(eCharacterVersion::NJ_JAYMISSIONS);
+						[[fallthrough]];
 					}
+					case eCharacterVersion::NJ_JAYMISSIONS: {
+						LOG("Fixing Nexus Force Explorer missions");
+						auto missions = { 502 /* Pet Cove */, 593/* Nimbus Station */, 938/* Avant Gardens */, 284/* Gnarled Forest */, 754/* Forbidden Valley */ };
+						bool complete = true;
+						for (auto missionID : missions) {
+							auto* mission = missionComponent->GetMission(missionID);
+							if (!mission || !mission->IsComplete()) {
+								complete = false;
+							}
+						}
 
-					if (complete) missionComponent->CompleteMission(937 /* Nexus Force explorer */);
-					levelComponent->SetCharacterVersion(eCharacterVersion::UP_TO_DATE);
-					[[fallthrough]];
-				}
-				case eCharacterVersion::UP_TO_DATE:
-					break;
+						if (complete) missionComponent->CompleteMission(937 /* Nexus Force explorer */);
+						levelComponent->SetCharacterVersion(eCharacterVersion::NEXUS_FORCE_EXPLORER);
+						[[fallthrough]];
+					}
+					case eCharacterVersion::NEXUS_FORCE_EXPLORER: {
+						LOG("Fixing pet IDs");
+
+						// First copy the original ids
+						const auto pets = inventoryComponent->GetPetsMut();
+
+						// Then clear the pets so we can re-add them with the updated IDs
+						auto& invPets = inventoryComponent->GetPetsMut();
+						invPets.clear();
+						for (auto& [id, databasePet] : pets) {
+							const auto originalID = id;
+							const auto newId = GeneralUtils::ClearBit(id, 32); // Persistent bit that didn't exist
+							LOG("New ID %llu", newId);
+							auto* item = inventoryComponent->FindItemBySubKey(originalID);
+							if (item) {
+								LOG("item subkey %llu", item->GetSubKey());
+								item->SetSubKey(newId);
+								invPets[newId] = databasePet;
+							}
+						}
+						levelComponent->SetCharacterVersion(eCharacterVersion::PET_IDS);
+						[[fallthrough]];
+					}
+					case eCharacterVersion::PET_IDS: {
+						LOG("Regenerating item ids");
+						inventoryComponent->RegenerateItemIDs();
+						levelComponent->SetCharacterVersion(eCharacterVersion::INVENTORY_PERSISTENT_IDS);
+						[[fallthrough]];
+					}
+					case eCharacterVersion::INVENTORY_PERSISTENT_IDS: {
+						LOG("Fixing racing meta missions");
+						missionComponent->FixRacingMetaMissions();
+						levelComponent->SetCharacterVersion(eCharacterVersion::UP_TO_DATE);
+						[[fallthrough]];
+					}
+					case eCharacterVersion::UP_TO_DATE:
+						break;
+					}
 				}
 
-				player->GetCharacter()->SetTargetScene("");
+				// Update the characters xml to ensure the update above is not only saved, but so the client picks up on the changes.
+				c->SaveXMLToDatabase();
 
 				// Fix the destroyable component
 				auto* destroyableComponent = player->GetComponent<DestroyableComponent>();
@@ -1129,6 +1143,23 @@ void HandlePacket(Packet* packet) {
 				if (destroyableComponent != nullptr) {
 					destroyableComponent->FixStats();
 				}
+
+				WorldPackets::SendCreateCharacter(packet->systemAddress, characterComponent->GetReputation(), player->GetObjectID(), c->GetXMLData(), username, c->GetGMLevel(), c->GetPropertyCloneID());
+				WorldPackets::SendServerState(packet->systemAddress);
+
+				const auto respawnPoint = player->GetCharacter()->GetRespawnPoint(Game::zoneManager->GetZone()->GetWorldID());
+
+				Game::entityManager->ConstructEntity(player, UNASSIGNED_SYSTEM_ADDRESS);
+
+				if (respawnPoint != NiPoint3Constant::ZERO) {
+					GameMessages::SendPlayerReachedRespawnCheckpoint(player, respawnPoint, QuatUtils::IDENTITY);
+				}
+
+				Game::entityManager->ConstructAllEntities(packet->systemAddress);
+
+				characterComponent->RocketUnEquip(player);
+
+				player->GetCharacter()->SetTargetScene("");
 
 				//Tell the player to generate BBB models, if any:
 				if (g_CloneID != 0) {
@@ -1146,34 +1177,36 @@ void HandlePacket(Packet* packet) {
 						LOG("Couldn't find property ID for zone %i, clone %i", zoneId, cloneId);
 						goto noBBB;
 					}
-					for (auto& bbbModel : Database::Get()->GetUgcModels(propertyId)) {
+
+					// Workaround for not having a UGC server to get model LXFML onto the client so it
+					// can generate the physics and nif for the object.
+
+					auto bbbModels = Database::Get()->GetUgcModels(propertyId);
+					if (bbbModels.empty()) {
+						LOG("No BBB models found for property %llu", propertyId);
+						goto noBBB;
+					}
+
+					CBITSTREAM;
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
+					bitStream.Write<LWOOBJID>(LWOOBJID_EMPTY); //always zero so that a check on the client passes
+					bitStream.Write(eBlueprintSaveResponseType::EverythingWorked);
+					bitStream.Write<uint32_t>(bbbModels.size());
+					for (auto& bbbModel : bbbModels) {
 						LOG("Getting lxfml ugcID: %llu", bbbModel.id);
 
 						bbbModel.lxfmlData.seekg(0, std::ios::end);
 						size_t lxfmlSize = bbbModel.lxfmlData.tellg();
 						bbbModel.lxfmlData.seekg(0);
 
-						//Send message:
+						// write data
 						LWOOBJID blueprintID = bbbModel.id;
-						GeneralUtils::SetBit(blueprintID, eObjectBits::CHARACTER);
-						GeneralUtils::SetBit(blueprintID, eObjectBits::PERSISTENT);
-
-						// Workaround for not having a UGC server to get model LXFML onto the client so it
-						// can generate the physics and nif for the object.
-						CBITSTREAM;
-						BitStreamUtils::WriteHeader(bitStream, eConnectionType::CLIENT, MessageType::Client::BLUEPRINT_SAVE_RESPONSE);
-						bitStream.Write<LWOOBJID>(LWOOBJID_EMPTY); //always zero so that a check on the client passes
-						bitStream.Write(eBlueprintSaveResponseType::EverythingWorked);
-						bitStream.Write<uint32_t>(1);
 						bitStream.Write(blueprintID);
-
 						bitStream.Write<uint32_t>(lxfmlSize);
-
 						bitStream.WriteAlignedBytes(reinterpret_cast<const unsigned char*>(bbbModel.lxfmlData.str().c_str()), lxfmlSize);
-
-						SystemAddress sysAddr = packet->systemAddress;
-						SEND_PACKET;
 					}
+					SystemAddress sysAddr = packet->systemAddress;
+					SEND_PACKET;
 				}
 
 			noBBB:
@@ -1193,7 +1226,7 @@ void HandlePacket(Packet* packet) {
 					const auto& playerName = character->GetName();
 
 					CBITSTREAM;
-					BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, MessageType::Chat::LOGIN_SESSION_NOTIFY);
+					BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, MessageType::Chat::LOGIN_SESSION_NOTIFY);
 					bitStream.Write(player->GetObjectID());
 					bitStream.Write<uint32_t>(playerName.size());
 					for (size_t i = 0; i < playerName.size(); i++) {
@@ -1251,7 +1284,7 @@ void HandlePacket(Packet* packet) {
 
 		CBITSTREAM;
 
-		BitStreamUtils::WriteHeader(bitStream, eConnectionType::CHAT, packet->data[14]);
+		BitStreamUtils::WriteHeader(bitStream, ServiceType::CHAT, packet->data[14]);
 
 		//We need to insert the player's objectID so the chat server can find who originated this request:
 		LWOOBJID objectID = 0;
@@ -1331,7 +1364,8 @@ void HandlePacket(Packet* packet) {
 			}
 		}
 
-		const auto segments = Game::chatFilter->IsSentenceOkay(request.message, entity->GetGMLevel(), !(isBestFriend && request.chatLevel == 1));
+		auto segments = Game::chatFilter->IsSentenceOkay(request.message, entity->GetGMLevel(), !(isBestFriend && request.chatLevel == 1));
+		if (Game::config->GetValue("disable_chat_filter") == "1") segments = { };
 
 		bool bAllClean = segments.empty();
 
@@ -1364,6 +1398,7 @@ void HandlePacket(Packet* packet) {
 			std::string playerName = user->GetLastUsedChar()->GetName();
 			bool isMythran = user->GetLastUsedChar()->GetGMLevel() > eGameMasterLevel::CIVILIAN;
 			bool isOk = Game::chatFilter->IsSentenceOkay(GeneralUtils::UTF16ToWTF8(chatMessage.message), user->GetLastUsedChar()->GetGMLevel()).empty();
+			if (Game::config->GetValue("disable_chat_filter") == "1") isOk = true;
 			LOG_DEBUG("Msg: %s was approved previously? %i", GeneralUtils::UTF16ToWTF8(chatMessage.message).c_str(), user->GetLastChatMessageApproved());
 			if (!isOk) return;
 			if (!isOk && !isMythran) return;
@@ -1497,7 +1532,6 @@ void FinalizeShutdown() {
 	LOG("Shutdown complete, zone (%i), instance (%i)", Game::server->GetZoneID(), g_InstanceID);
 
 	//Delete our objects here:
-	Metrics::Clear();
 	dpWorld::Shutdown();
 	Database::Destroy("WorldServer");
 	if (Game::chatFilter) delete Game::chatFilter;
@@ -1520,6 +1554,6 @@ void FinalizeShutdown() {
 
 void SendShutdownMessageToMaster() {
 	CBITSTREAM;
-	BitStreamUtils::WriteHeader(bitStream, eConnectionType::MASTER, MessageType::Master::SHUTDOWN_RESPONSE);
+	BitStreamUtils::WriteHeader(bitStream, ServiceType::MASTER, MessageType::Master::SHUTDOWN_RESPONSE);
 	Game::server->SendToMaster(bitStream);
 }

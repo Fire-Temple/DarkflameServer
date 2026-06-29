@@ -32,7 +32,7 @@
 #include "EchoSyncSkill.h"
 #include "eMissionTaskType.h"
 #include "eReplicaComponentType.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Game.h"
 #include "ePlayerFlag.h"
 #include "dConfig.h"
@@ -48,6 +48,7 @@ namespace {
 		{ REQUEST_USE, []() { return std::make_unique<RequestUse>(); }},
 		{ REQUEST_SERVER_OBJECT_INFO, []() { return std::make_unique<RequestServerObjectInfo>(); } },
 		{ SHOOTING_GALLERY_FIRE, []() { return std::make_unique<ShootingGalleryFire>(); } },
+		{ PICKUP_ITEM, []() { return std::make_unique<PickupItem>(); } },
 	};
 };
 
@@ -59,6 +60,11 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 	Entity* entity = Game::entityManager->GetEntity(objectID);
 
 	User* usr = UserManager::Instance()->GetUser(sysAddr);
+
+	if (!usr) {
+		LOG("Failed to find a logged in user for (%llu), aborting GM: %4i, %s!", objectID, messageID, StringifiedEnum::ToString(messageID).data());
+		return;
+	}
 
 	if (!entity) {
 		LOG("Failed to find associated entity (%llu), aborting GM: %4i, %s!", objectID, messageID, StringifiedEnum::ToString(messageID).data());
@@ -75,7 +81,8 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		if (msg->requiredGmLevel > eGameMasterLevel::CIVILIAN) {
 			auto* usingEntity = Game::entityManager->GetEntity(usr->GetLoggedInChar());
 			if (!usingEntity || usingEntity->GetGMLevel() < msg->requiredGmLevel) {
-				LOG("User %s (%llu) does not have the required GM level to execute this command.", usingEntity->GetCharacter()->GetName().c_str(), usingEntity->GetObjectID());
+				if (usingEntity) LOG("User %s (%llu) does not have the required GM level to execute this command.", usingEntity->GetCharacter()->GetName().c_str(), usingEntity->GetObjectID());
+				else LOG("ObjectID %llu tried to use a gm required message.", usr->GetLoggedInChar());
 				return;
 			}
 		}
@@ -166,8 +173,8 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 
 		GameMessages::SendRestoreToPostLoadStats(entity, sysAddr);
 
-		auto* destroyable = entity->GetComponent<DestroyableComponent>();
-		destroyable->SetImagination(destroyable->GetImagination());
+		auto* const destroyable = entity->GetComponent<DestroyableComponent>();
+		if (destroyable) destroyable->SetImagination(destroyable->GetImagination());
 		Game::entityManager->SerializeEntity(entity);
 
 		std::vector<Entity*> racingControllers = Game::entityManager->GetEntitiesByComponent(eReplicaComponentType::RACING_CONTROL);
@@ -185,7 +192,7 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 
 		std::vector<Entity*> scriptedActs = Game::entityManager->GetEntitiesByComponent(eReplicaComponentType::SCRIPT);
 		for (Entity* scriptEntity : scriptedActs) {
-			if (scriptEntity->GetObjectID() != zoneControl->GetObjectID()) { // Don't want to trigger twice on instance worlds
+			if (!zoneControl || scriptEntity->GetObjectID() != zoneControl->GetObjectID()) { // Don't want to trigger twice on instance worlds
 				scriptEntity->GetScript()->OnPlayerLoaded(scriptEntity, entity);
 			}
 		}
@@ -281,11 +288,6 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		break;
 	}
 
-	case MessageType::Game::PICKUP_ITEM: {
-		GameMessages::HandlePickupItem(inStream, entity);
-		break;
-	}
-
 	case MessageType::Game::RESURRECT: {
 		GameMessages::HandleResurrect(inStream, entity);
 		break;
@@ -336,9 +338,9 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		if (behaviorId > 0) {
 			auto bs = RakNet::BitStream(reinterpret_cast<unsigned char*>(&startSkill.sBitStream[0]), startSkill.sBitStream.size(), false);
 
-			auto* skillComponent = entity->GetComponent<SkillComponent>();
+			auto* const skillComponent = entity->GetComponent<SkillComponent>();
 
-			success = skillComponent->CastPlayerSkill(behaviorId, startSkill.uiSkillHandle, bs, startSkill.optionalTargetID, startSkill.skillID);
+			if (skillComponent) success = skillComponent->CastPlayerSkill(behaviorId, startSkill.uiSkillHandle, bs, startSkill.optionalTargetID, startSkill.skillID);
 
 			if (success && entity->GetCharacter()) {
 				DestroyableComponent* destComp = entity->GetComponent<DestroyableComponent>();
@@ -353,7 +355,7 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		if (success) {
 			//Broadcast our startSkill:
 			RakNet::BitStream bitStreamLocal;
-			BitStreamUtils::WriteHeader(bitStreamLocal, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+			BitStreamUtils::WriteHeader(bitStreamLocal, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 			bitStreamLocal.Write(entity->GetObjectID());
 
 			EchoStartSkill echoStartSkill;
@@ -375,7 +377,7 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 
 	case MessageType::Game::SYNC_SKILL: {
 		RakNet::BitStream bitStreamLocal;
-		BitStreamUtils::WriteHeader(bitStreamLocal, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+		BitStreamUtils::WriteHeader(bitStreamLocal, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 		bitStreamLocal.Write(entity->GetObjectID());
 
 		SyncSkill sync = SyncSkill(inStream); // inStream replaced &bitStream
@@ -391,9 +393,9 @@ void GameMessageHandler::HandleMessage(RakNet::BitStream& inStream, const System
 		if (usr != nullptr) {
 			auto bs = RakNet::BitStream(reinterpret_cast<unsigned char*>(&sync.sBitStream[0]), sync.sBitStream.size(), false);
 
-			auto* skillComponent = entity->GetComponent<SkillComponent>();
+			auto* const skillComponent = entity->GetComponent<SkillComponent>();
 
-			skillComponent->SyncPlayerSkill(sync.uiSkillHandle, sync.uiBehaviorHandle, bs);
+			if (skillComponent) skillComponent->SyncPlayerSkill(sync.uiSkillHandle, sync.uiBehaviorHandle, bs);
 		}
 
 		EchoSyncSkill echo = EchoSyncSkill();

@@ -8,39 +8,26 @@
 #include "RenderComponent.h"
 #include "eStateChangeType.h"
 
-void NjFireRocks::OnStartup(Entity* self) {
-	
+void NjFireRocks::OnStartup(Entity* self) {			
+	// set defaults
 	if (self->GetVar<std::u16string>(u"RockManagerGroup") != u"LavaRocks02Controller") {
 		self->SetVar<std::u16string>(u"RockManagerGroup", u"FireTransRocksManager");
 	}
 	
-	self->AddTimer("StartRocks", 23);	
-}	
+	// start pathing on load
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	if (!movingPlatformComponent) return;
+	movingPlatformComponent->SetNoAutoStart(false);	
+}
 
-void NjFireRocks::OnTimerDone(Entity* self, std::string timerName) {	
+void NjFireRocks::OnWaypointReached(Entity* self, uint32_t waypointIndex) {
+	if (waypointIndex == 1) {
+		const auto managerGroup = GeneralUtils::UTF16ToWTF8(self->GetVar<std::u16string>(u"RockManagerGroup"));
+		const auto managerEntity = Game::entityManager->GetEntitiesInGroup(managerGroup);
+		
+		for (auto* manager : managerEntity) {
+			manager->NotifyObject(self, "PlatformArrived");
+		}			
+	}
+}
 
-	if (timerName == "PlatHold") {
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, 
-		eMovementPlatformState::Moving);
-
-		GameMessages::SendPlayNDAudioEmitter(self, UNASSIGNED_SYSTEM_ADDRESS, 
-		"{5433a544-758e-4e9e-80d7-e60799f5b7ff}");
-		self->AddTimer("StopSFX", 2.7f);		
-		
-		self->AddTimer("StartRocks", 7);						
-	}
-	else if (timerName == "StartRocks") {		
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1, 1, 
-		eMovementPlatformState::Moving);
-		
-		GameMessages::SendPlayNDAudioEmitter(self, UNASSIGNED_SYSTEM_ADDRESS, 
-		"{5433a544-758e-4e9e-80d7-e60799f5b7ff}");	
-		self->AddTimer("StopSFX", 2.7f);		
-		
-		self->AddTimer("PlatHold", 9.5f);				
-	}
-	else if (timerName == "StopSFX") {	
-		GameMessages::SendStopNDAudioEmitter(self, UNASSIGNED_SYSTEM_ADDRESS, 
-		"{5433a544-758e-4e9e-80d7-e60799f5b7ff}");
-	}
-}		

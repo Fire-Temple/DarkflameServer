@@ -23,7 +23,7 @@ class ProximityMonitorComponent final : public Component {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::PROXIMITY_MONITOR;
 
-	ProximityMonitorComponent(Entity* parentEntity, int smallRadius = -1, int largeRadius = -1);
+	ProximityMonitorComponent(Entity* parentEntity, const int32_t componentID, int smallRadius = -1, int largeRadius = -1);
 	~ProximityMonitorComponent() override;
 	void Update(float deltaTime) override;
 
@@ -64,6 +64,7 @@ public:
 
 private:
 
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
 	/**
 	 * All the proximity sensors for this component, indexed by name
 	 */

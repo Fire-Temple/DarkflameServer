@@ -51,7 +51,7 @@ void NtCombatChallengeServer::OnMessageBoxResponse(Entity* self, Entity* sender,
 		auto* inventoryComponent = sender->GetComponent<InventoryComponent>();
 
 		if (inventoryComponent != nullptr) {
-			inventoryComponent->RemoveItem(3039, 1);
+			inventoryComponent->RemoveItem(3039, 1, eInventoryType::ALL);
 		}
 
 		GameMessages::SendPlayNDAudioEmitter(self, sender->GetSystemAddress(), startSound);
@@ -89,7 +89,7 @@ void NtCombatChallengeServer::SpawnTargetDummy(Entity* self) {
 	info.spawnerID = self->GetObjectID();
 	info.pos = self->GetPosition();
 	info.rot = self->GetRotation();
-	info.settings = { new LDFData<std::string>(u"custom_script_server", "scripts\\02_server\\Map\\NT\\L_NT_COMBAT_CHALLENGE_DUMMY.lua") };
+	info.settings.Insert(u"custom_script_server", "scripts\\02_server\\Map\\NT\\L_NT_COMBAT_CHALLENGE_DUMMY.lua");
 
 	auto* dummy = Game::entityManager->CreateEntity(info, nullptr, self);
 
@@ -108,7 +108,7 @@ void NtCombatChallengeServer::OnChildLoaded(Entity& self, GameMessages::ChildLoa
 	auto* const child = Game::entityManager->GetEntity(childLoaded.childID);
 
 	if (child) {
-		child->SetRotation(NiQuaternion::FromEulerAngles(child->GetRotation().GetEulerAngles() += NiPoint3(0, PI, 0))); // rotate 180 degrees
+		child->SetRotation(QuatUtils::FromEuler(QuatUtils::Euler(child->GetRotation()) += NiPoint3(0, PI, 0))); // rotate 180 degrees
 	}
 
 	self.SetVar(u"currentTargetID", child->GetObjectID());

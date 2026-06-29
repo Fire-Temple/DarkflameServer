@@ -3,7 +3,7 @@
 #include "InventoryComponent.h"
 #include "CharacterComponent.h"
 
-MultiZoneEntranceComponent::MultiZoneEntranceComponent(Entity* parent) : Component(parent) {
+MultiZoneEntranceComponent::MultiZoneEntranceComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	m_Parent = parent;
 	std::string zoneString = GeneralUtils::UTF16ToWTF8(m_Parent->GetVar<std::u16string>(u"MultiZoneIDs"));
 	std::stringstream ss(zoneString);
@@ -17,7 +17,10 @@ MultiZoneEntranceComponent::MultiZoneEntranceComponent(Entity* parent) : Compone
 MultiZoneEntranceComponent::~MultiZoneEntranceComponent() {}
 
 void MultiZoneEntranceComponent::OnUse(Entity* originator) {
-	auto* rocket = originator->GetComponent<CharacterComponent>()->RocketEquip(originator);
+	auto* const characterComponent = originator->GetComponent<CharacterComponent>();
+	if (!characterComponent) return;
+
+	auto* rocket = characterComponent->RocketEquip(originator);
 	if (!rocket) return;
 
 	// the LUP world menu is just the property menu, the client knows how to handle it
@@ -26,7 +29,7 @@ void MultiZoneEntranceComponent::OnUse(Entity* originator) {
 
 void MultiZoneEntranceComponent::OnSelectWorld(Entity* originator, uint32_t index) {
 	auto* rocketLaunchpadControlComponent = m_Parent->GetComponent<RocketLaunchpadControlComponent>();
-	if (!rocketLaunchpadControlComponent) return;
+	if (!rocketLaunchpadControlComponent || index >= m_LUPWorlds.size()) return;
 
 	rocketLaunchpadControlComponent->Launch(originator, m_LUPWorlds[index], 0);
 }

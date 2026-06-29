@@ -19,7 +19,7 @@ class Entity;
  */
 class Component {
 public:
-	Component(Entity* parent) : m_Parent{ parent } {}
+	Component(Entity* parent, const int32_t componentID) : m_Parent{ parent }, m_ComponentID{componentID} {}
 	virtual ~Component() = default;
 
 	/**
@@ -27,6 +27,8 @@ public:
 	 * @return the owner of this component
 	 */
 	Entity* GetParent() const { return m_Parent; }
+
+	[[nodiscard]] int32_t GetComponentID() const noexcept { return m_ComponentID; }
 
 	/**
 	 * Updates the component in the game loop
@@ -53,15 +55,29 @@ public:
 	virtual void LoadFromXml(const tinyxml2::XMLDocument& doc) {}
 
 	virtual void Serialize(RakNet::BitStream& outBitStream, bool isConstruction) {}
-
 protected:
+	template<typename GameObjClass, typename DerivedMsg>
+	inline void RegisterMsg(bool (GameObjClass::*handler)(DerivedMsg&)) {
+		static_assert(std::is_base_of_v<GameMessages::GameMsg, DerivedMsg>, "DerivedMsg must inherit from GameMsg");
+		static_assert(std::is_base_of_v<Component, GameObjClass>, "GameObjClass must inherit from Component");
+		const auto handlerBound = std::bind(handler, static_cast<GameObjClass*>(this), std::placeholders::_1);
+		const auto castWrapper = [handlerBound](GameMessages::GameMsg& msg) {
+			return handlerBound(static_cast<DerivedMsg&>(msg));
+		};
 
-	void RegisterMsg(const MessageType::Game msgId, auto* self, const auto handler) {
-		m_Parent->RegisterMsg(msgId, std::bind(handler, self, std::placeholders::_1));
+		DerivedMsg msg;
+		m_Parent->RegisterMsg(msg.msgId, castWrapper);
 	}
 
 	/**
 	 * The entity that owns this component
 	 */
 	Entity* m_Parent;
+
+	// The component ID, this should never be changed after initialization
+	// This is used in various different ways
+	// 1. To identify which entry this component is in its corresponding table
+	// 2. To mark that an Entity should have the component with no database entry (it will be 0 in this case)
+	// 3. The component exists implicitly due to design (CollectibleComponent always has a DestructibleComponent accompanying it). In this case the ID will be -1.
+	const int32_t m_ComponentID;
 };

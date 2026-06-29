@@ -62,7 +62,7 @@ class MovementAIComponent final : public Component {
 public:
 	static constexpr eReplicaComponentType ComponentType = eReplicaComponentType::MOVEMENT_AI;
 
-	MovementAIComponent(Entity* parentEntity, MovementAIInfo info);
+	MovementAIComponent(Entity* parentEntity, const int32_t componentID, MovementAIInfo info);
 
 	void SetPath(const std::string pathName);
 
@@ -211,7 +211,16 @@ public:
 
 	bool IsPaused() const { return m_Paused; }
 
+	bool OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo);
+
+	bool HasPath() const { return m_Path != nullptr; }
 private:
+
+	/**
+	 * @brief
+	 * Runs the commands on a waypoint if a path exists
+	 */
+	void RunWaypointCommands(uint32_t waypointNum);
 
 	/**
 	 * Sets the current position of the entity
@@ -325,6 +334,9 @@ private:
 	NiPoint3 m_SavedVelocity;
 
 	bool m_IsBounced{};
+
+	// The number of waypoints that were on the path in the call to SetPath
+	uint32_t m_CurrentPathWaypointCount{ 0 };
 };
 
 #endif // MOVEMENTAICOMPONENT_H

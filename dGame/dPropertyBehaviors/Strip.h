@@ -12,6 +12,7 @@ namespace tinyxml2 {
 
 class AMFArrayValue;
 class ModelComponent;
+struct UpdateResult;
 
 class Strip {
 public:
@@ -33,15 +34,16 @@ public:
 	// Checks the movement logic for whether or not to proceed
 	// Returns true if the movement can continue, false if it needs to wait more.
 	bool CheckMovement(float deltaTime, ModelComponent& modelComponent);
-	void Update(float deltaTime, ModelComponent& modelComponent);
+	void Update(float deltaTime, ModelComponent& modelComponent, UpdateResult& updateResult);
 	void SpawnDrop(LOT dropLOT, Entity& entity);
-	void ProcNormalAction(float deltaTime, ModelComponent& modelComponent);
+	void ProcNormalAction(float deltaTime, ModelComponent& modelComponent, UpdateResult& updateResult);
 	void RemoveStates(ModelComponent& modelComponent) const;
 
 	// 2 actions are required for strips to work
 	bool HasMinimumActions() const { return m_Actions.size() >= 2; }
 	
 	void OnChatMessageReceived(const std::string& sMessage);
+	void OnHit();
 private:
 	// Indicates this Strip is waiting for an action to be taken upon it to progress to its actions
 	bool m_WaitingForAction{ false };

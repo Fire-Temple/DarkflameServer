@@ -48,7 +48,7 @@ void AmDrawBridge::OnTimerDone(Entity* self, std::string timerName) {
 		}
 
 		self->SetNetworkVar(u"BridgeLeaving", true);
-		self->SetVar(u"BridgeDown", false);
+		self->SetNetworkVar(u"InUse", false);
 	} else if (timerName == "SmashEffectBridge") {
 		self->SetNetworkVar(u"SmashBridge", 5);
 	} else if (timerName == "rotateBridgeDown") {
@@ -93,7 +93,7 @@ void AmDrawBridge::MoveBridgeDown(Entity* self, Entity* bridge, bool down) {
 		return;
 	}
 
-	auto forwardVect = simplePhysicsComponent->GetRotation().GetForwardVector();
+	auto forwardVect = QuatUtils::Forward(simplePhysicsComponent->GetRotation());
 
 	auto degrees = down ? 90.0f : -90.0f;
 

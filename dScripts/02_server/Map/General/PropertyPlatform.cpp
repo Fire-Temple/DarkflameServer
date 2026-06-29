@@ -3,25 +3,22 @@
 #include "GameMessages.h"
 #include "MovingPlatformComponent.h"
 
-void PropertyPlatform::OnQuickBuildComplete(Entity* self, Entity* target) {
-	//    auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
-	//    if (movingPlatform != nullptr) {
-	//        movingPlatform->StopPathing();
-	//        movingPlatform->SetNoAutoStart(true);
-	//    }
-	GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0,
-		0, 0, eMovementPlatformState::Stationary);
+void PropertyPlatform::OnStartup(Entity* self) {
+	auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
+	if (movingPlatform == nullptr) return;
+	
+	// some of these have startPathingOnLoad, let's fix that
+	movingPlatform->SetNoAutoStart(true);	
 }
 
 void PropertyPlatform::OnUse(Entity* self, Entity* user) {
 	auto* quickBuildComponent = self->GetComponent<QuickBuildComponent>();
+	
 	if (quickBuildComponent != nullptr && quickBuildComponent->GetState() == eQuickBuildState::COMPLETED) {
-		//        auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
-		//        if (movingPlatform != nullptr) {
-		//            movingPlatform->GotoWaypoint(1);
-		//        }
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0,
-			1, 1, eMovementPlatformState::Moving);
+		auto* movingPlatform = self->GetComponent<MovingPlatformComponent>();
+		
+		if (movingPlatform != nullptr)
+			movingPlatform->GotoWaypoint(1);
 
 		self->AddCallbackTimer(movementDelay + effectDelay, [self, this]() {
 			self->SetNetworkVar<float_t>(u"startEffect", dieDelay);

@@ -13,7 +13,10 @@ void CavePrisonCage::OnStartup(Entity* self) {
 		return;
 	}
 
-	auto* spawner = Game::zoneManager->GetSpawnersByName("PrisonCounterweight_0" + GeneralUtils::UTF16ToWTF8(myNum))[0];
+	const auto spawners = Game::zoneManager->GetSpawnersByName("PrisonCounterweight_0" + GeneralUtils::UTF16ToWTF8(myNum));
+	if (spawners.empty()) return;
+
+	auto* spawner = spawners[0];
 
 	self->SetVar<Spawner*>(u"CWSpawner", spawner);
 
@@ -21,6 +24,7 @@ void CavePrisonCage::OnStartup(Entity* self) {
 }
 
 void CavePrisonCage::Setup(Entity* self, Spawner* spawner) {
+	if (!spawner) return;
 	SpawnCounterweight(self, spawner);
 
 	NiPoint3 mypos = self->GetPosition();
@@ -62,6 +66,8 @@ void CavePrisonCage::OnQuickBuildNotifyState(Entity* self, eQuickBuildState stat
 }
 
 void CavePrisonCage::SpawnCounterweight(Entity* self, Spawner* spawner) {
+	if (!spawner) return;
+
 	spawner->Reset();
 
 	auto* counterweight = spawner->Spawn();
@@ -76,20 +82,8 @@ void CavePrisonCage::SpawnCounterweight(Entity* self, Spawner* spawner) {
 			});
 
 		quickBuildComponent->AddQuickBuildCompleteCallback([this, self](Entity* user) {
-			// The counterweight is a simple mover, which is not implemented, so we'll just set it's position
-			auto* counterweight = Game::entityManager->GetEntity(self->GetVar<LWOOBJID>(u"Counterweight"));
 
-			if (counterweight == nullptr) {
-				return;
-			}
-
-			// Move the counterweight down 2 units
-			counterweight->SetPosition(counterweight->GetPosition() + NiPoint3(0, -2, 0));
-
-			// Serialize the counterweight
-			Game::entityManager->SerializeEntity(counterweight);
-
-			// notifyPlatformAtLastWaypoint
+			// The counterweight has startPathingOnLoad, so we don't need to do anything
 
 			// Save the userID as Builder
 			self->SetVar<LWOOBJID>(u"Builder", user->GetObjectID());
@@ -164,7 +158,8 @@ void CavePrisonCage::OnTimerDone(Entity* self, std::string timerName) {
 		const auto flagNum = 2020 + self->GetVarAs<int32_t>(u"myNumber");
 
 		// Set the flag on the builder character
-		builder->GetCharacter()->SetPlayerFlag(flagNum, true);
+		auto* const character = builder->GetCharacter();
+		if (character) character->SetPlayerFlag(flagNum, true);
 
 		// Setup a timer named 'VillagerEscape' to be triggered in 5 seconds
 		self->AddTimer("VillagerEscape", 5.0f);

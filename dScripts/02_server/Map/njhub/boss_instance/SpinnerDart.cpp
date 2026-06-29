@@ -13,15 +13,10 @@
 void SpinnerDart::OnStartup(Entity* self) {
 	self->SetNetworkVar(u"bIsInUse", false);
 	self->SetVar(u"bActive", true);
-//	self->AddTimer("MoveUp", 22.9f);	
-//	SpawnLegs(self, "Inverse");	
-
-	auto startAtEnd = self->GetVar<bool>(u"platformStartAtEnd");
 	
 	if (self->GetVar<bool>(u"platformStartAtEnd")) {
-		self->AddTimer("MoveUp", 23.9f);	
-	} else {	
-		self->AddTimer("MoveDown", 23.7f);	
+		self->SetVar<int>(u"IsUp", 1);
+		self->AddTimer("Shoot", 1);
 	}
 }
 
@@ -38,13 +33,16 @@ void SpinnerDart::OnNotifyObject(Entity* self, Entity* sender, const std::string
 }		
 
 void SpinnerDart::OnTimerDone(Entity* self, std::string timerName) {
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 	
 	if (timerName == "MoveUp") {
 		self->SetVar<int>(u"IsUp", 1);	
 		
 		RenderComponent::PlayAnimation(self, u"up");
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 0, 1);
-		self->AddTimer("IdleUp", 1.0f);	
+
+		movingPlatformComponent->GotoWaypoint(1);
+
+		self->AddTimer("IdleUp", 1);	
 		
 //		Ascend sfx
 		GameMessages::SendPlayNDAudioEmitter(self, self->GetSystemAddress(), "{7f770ade-b84c-46ad-b3ae-bdbace5985d4}");
@@ -55,13 +53,14 @@ void SpinnerDart::OnTimerDone(Entity* self, std::string timerName) {
 		self->CancelTimer("Shoot");	
 	
 //		const auto RailEntity = Game::entityManager->GetEntitiesInGroup("DartSpinnersFRail1");	
-//		for (auto* rail : RailEntity) {	
-//			rail->SetVar<int>(u"SpinnerIsUp", 0);
-//		}	
+//		for (auto* rail : RailEntity) rail->SetVar<int>(u"SpinnerIsUp", 0);
+
 		self->AddTimer("RailDown", 1.5f);		
 
 		RenderComponent::PlayAnimation(self, u"down");
-		GameMessages::SendPlatformResync(self, UNASSIGNED_SYSTEM_ADDRESS, true, 1, 0, 0, eMovementPlatformState::Moving);
+
+		movingPlatformComponent->GotoWaypoint(0);
+		
 		self->CancelTimer("IdleUp");		
 		
 //		Descend sfx
@@ -71,7 +70,7 @@ void SpinnerDart::OnTimerDone(Entity* self, std::string timerName) {
 	else if (timerName == "IdleUp") {	
 		RenderComponent::PlayAnimation(self, u"idle-up");	
 		if (self->GetVar<int>(u"IsUp") == 1) {
-			self->AddTimer("Shoot", 1.0f);		
+			self->AddTimer("Shoot", 1);		
 		}	
 	}
 	else if (timerName == "Shoot") {	
@@ -101,7 +100,7 @@ void SpinnerDart::OnTimerDone(Entity* self, std::string timerName) {
 				}						
 			}
 			
-			self->AddTimer("Shoot", 1.0f);		
+			self->AddTimer("Shoot", 1);		
 		}			
 		
 	}

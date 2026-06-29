@@ -6,6 +6,11 @@
 void RaceShipLapColumnsServer::OnStartup(Entity* self) {
 	self->SetVar(u"Lap2Complete", false);
 	self->SetVar(u"Lap3Complete", false);
+	
+	auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
+	if (movingPlatformComponent != nullptr) {
+		movingPlatformComponent->SetNoAutoStart(true);
+	}
 }
 
 void SetMovingToWaypoint(const int32_t waypointIndex, const std::string group) {
@@ -18,13 +23,12 @@ void SetMovingToWaypoint(const int32_t waypointIndex, const std::string group) {
 	auto* movingPlatfromComponent = entity->GetComponent<MovingPlatformComponent>();
 	if (!movingPlatfromComponent) return;
 
-	movingPlatfromComponent->SetSerialized(true);
 	movingPlatfromComponent->GotoWaypoint(waypointIndex);
 	Game::entityManager->SerializeEntity(entity);
 }
 
 void RaceShipLapColumnsServer::OnCollisionPhantom(Entity* self, Entity* target) {
-	if (!target) return;
+	if (!target || !target->IsPlayer()) return;
 
 	const auto racingControllers = Game::entityManager->GetEntitiesByComponent(eReplicaComponentType::RACING_CONTROL);
 	if (racingControllers.empty()) return;

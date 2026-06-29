@@ -23,7 +23,7 @@
 #include "DoClientProjectileImpact.h"
 #include "CDClientManager.h"
 #include "CDSkillBehaviorTable.h"
-#include "eConnectionType.h"
+#include "ServiceType.h"
 #include "MessageType/Client.h"
 
 ProjectileSyncEntry::ProjectileSyncEntry() {
@@ -125,8 +125,7 @@ void SkillComponent::SyncPlayerProjectile(const LWOOBJID projectileId, RakNet::B
 	this->m_managedProjectiles.erase(this->m_managedProjectiles.begin() + index);
 
 	GameMessages::ActivityNotify notify;
-	notify.notification.push_back( std::make_unique<LDFData<int32_t>>(u"shot_done", sync_entry.skillId));
-
+	notify.notification.Insert<int32_t>(u"shot_done", sync_entry.skillId);
 	m_Parent->OnActivityNotify(notify);
 }
 
@@ -316,7 +315,7 @@ SkillExecutionResult SkillComponent::CalculateBehavior(
 			start.originatorRot = originator->GetRotation();
 		}
 
-		if (rotationOverride != NiQuaternionConstant::IDENTITY) {
+		if (rotationOverride != QuatUtils::IDENTITY) {
 			start.originatorRot = rotationOverride;
 		}
 		//start.optionalTargetID = target;
@@ -326,7 +325,7 @@ SkillExecutionResult SkillComponent::CalculateBehavior(
 		// Write message
 		RakNet::BitStream message;
 
-		BitStreamUtils::WriteHeader(message, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+		BitStreamUtils::WriteHeader(message, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 		message.Write(this->m_Parent->GetObjectID());
 		start.Serialize(message);
 
@@ -457,7 +456,7 @@ void SkillComponent::SyncProjectileCalculation(const ProjectileSyncEntry& entry)
 
 	RakNet::BitStream message;
 
-	BitStreamUtils::WriteHeader(message, eConnectionType::CLIENT, MessageType::Client::GAME_MSG);
+	BitStreamUtils::WriteHeader(message, ServiceType::CLIENT, MessageType::Client::GAME_MSG);
 	message.Write(this->m_Parent->GetObjectID());
 	projectileImpact.Serialize(message);
 
@@ -489,7 +488,7 @@ void SkillComponent::HandleUnCast(const uint32_t behaviorId, const LWOOBJID targ
 	behavior->UnCast(&context, { target });
 }
 
-SkillComponent::SkillComponent(Entity* parent) : Component(parent) {
+SkillComponent::SkillComponent(Entity* parent, const int32_t componentID) : Component(parent, componentID) {
 	this->m_skillUid = 0;
 }
 

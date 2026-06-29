@@ -28,6 +28,7 @@
 #include "CDObjectSkillsTable.h"
 #include "CDComponentsRegistryTable.h"
 #include "CDPackageComponentTable.h"
+#include <ranges>
 
 namespace {
 	const std::map<std::string, std::string> ExtraSettingAbbreviations = {
@@ -46,7 +47,7 @@ namespace {
 	};
 }
 
-Item::Item(const LWOOBJID id, const LOT lot, Inventory* inventory, const uint32_t slot, const uint32_t count, const bool bound, const std::vector<LDFBaseData*>& config, const LWOOBJID parent, LWOOBJID subKey, eLootSourceType lootSourceType) {
+Item::Item(const LWOOBJID id, const LOT lot, Inventory* inventory, const uint32_t slot, const uint32_t count, const bool bound, const LwoNameValue& config, const LWOOBJID parent, LWOOBJID subKey, eLootSourceType lootSourceType) {
 	if (!Inventory::IsValidItem(lot)) {
 		return;
 	}
@@ -71,7 +72,7 @@ Item::Item(
 	Inventory* inventory,
 	const uint32_t slot,
 	const uint32_t count,
-	const std::vector<LDFBaseData*>& config,
+	const LwoNameValue& config,
 	const LWOOBJID parent,
 	bool showFlyingLoot,
 	bool isModMoveAndEquip,
@@ -98,22 +99,12 @@ Item::Item(
 	this->preconditions = new PreconditionExpression(this->info->reqPrecondition);
 	this->subKey = subKey;
 
-	LWOOBJID id = ObjectIDManager::GenerateRandomObjectID();
-
-	GeneralUtils::SetBit(id, eObjectBits::CHARACTER);
-	GeneralUtils::SetBit(id, eObjectBits::PERSISTENT);
-
-	const auto type = static_cast<eItemType>(info->itemType);
-
-	if (type == eItemType::MOUNT) {
-		GeneralUtils::SetBit(id, eObjectBits::CLIENT);
-	}
-
-	this->id = id;
+	auto* const inventoryComponent = inventory->GetComponent();
+	GenerateID();
 
 	inventory->AddManagedItem(this);
 
-	auto* entity = inventory->GetComponent()->GetParent();
+	auto* entity = inventoryComponent->GetParent();
 	GameMessages::SendAddItemToInventoryClientSync(entity, entity->GetSystemAddress(), this, id, showFlyingLoot, static_cast<int>(this->count), subKey, lootSourceType);
 
 	if (isModMoveAndEquip) {
@@ -121,7 +112,7 @@ Item::Item(
 
 		LOG("Move and equipped (%i) from (%i)", this->lot, this->inventory->GetType());
 
-		Game::entityManager->SerializeEntity(inventory->GetComponent()->GetParent());
+		Game::entityManager->SerializeEntity(inventoryComponent->GetParent());
 	}
 }
 
@@ -141,11 +132,11 @@ uint32_t Item::GetSlot() const {
 	return slot;
 }
 
-std::vector<LDFBaseData*> Item::GetConfig() const {
+const LwoNameValue& Item::GetConfig() const {
 	return config;
 }
 
-std::vector<LDFBaseData*>& Item::GetConfig() {
+LwoNameValue& Item::GetConfig() {
 	return config;
 }
 
@@ -289,11 +280,10 @@ bool Item::Consume() {
 
 	GameMessages::SendUseItemResult(inventory->GetComponent()->GetParent(), lot, success);
 
-	if (success) {
+	const auto myLot = this->lot;
+	if (success && inventory->GetComponent()->RemoveItem(lot, 1, eInventoryType::ALL)) {
 		// Save this because if this is the last item in the inventory
 		// we may delete ourself (lol)
-		const auto myLot = this->lot;
-		inventory->GetComponent()->RemoveItem(lot, 1);
 		auto* missionComponent = inventory->GetComponent()->GetParent()->GetComponent<MissionComponent>();
 		if (missionComponent) missionComponent->Progress(eMissionTaskType::GATHER, myLot, LWOOBJID_EMPTY, "", -1);
 	}
@@ -354,9 +344,9 @@ void Item::UseNonEquip(Item* item) {
 				if (this->GetPreconditionExpression()->Check(playerInventoryComponent->GetParent())) {
 					auto* entityParent = playerInventoryComponent->GetParent();
 					// Roll the loot for all the packages then see if it all fits.  If it fits, give it to the player, otherwise don't.
-					std::unordered_map<LOT, int32_t> rolledLoot{};
+					Loot::Return rolledLoot{};
 					for (auto& pack : packages) {
-						auto thisPackage = Loot::RollLootMatrix(entityParent, pack.LootMatrixIndex);
+						const auto thisPackage = Loot::RollLootMatrix(entityParent, pack.LootMatrixIndex);
 						for (auto& loot : thisPackage) {
 							// If we already rolled this lot, add it to the existing one, otherwise create a new entry.
 							auto existingLoot = rolledLoot.find(loot.first);
@@ -367,6 +357,7 @@ void Item::UseNonEquip(Item* item) {
 							}
 						}
 					}
+
 					if (playerInventoryComponent->HasSpaceForLoot(rolledLoot)) {
 						Loot::GiveLoot(playerInventoryComponent->GetParent(), rolledLoot, eLootSourceType::CONSUMPTION);
 						item->SetCount(item->GetCount() - 1);
@@ -389,7 +380,7 @@ void Item::UseNonEquip(Item* item) {
 }
 
 void Item::Disassemble(const eInventoryType inventoryType) {
-	for (auto* data : config) {
+	for (const auto& data : config.values | std::views::values) {
 		if (data->GetKey() == u"assemblyPartLOTs") {
 			auto modStr = data->GetValueAsString();
 
@@ -411,7 +402,8 @@ void Item::Disassemble(const eInventoryType inventoryType) {
 			const auto deliminator = '+';
 
 			while (std::getline(ssData, token, deliminator)) {
-				const auto modLot = std::stoi(token.substr(2, token.size() - 1));
+				if (token.size() <= 2) continue; // invalid token, must have size of at least 3.
+				const auto modLot = GeneralUtils::TryParse(token.substr(2, token.size() - 1), LOT_NULL);
 
 				modArray.push_back(modLot);
 			}
@@ -450,7 +442,10 @@ void Item::DisassembleModel(uint32_t numToDismantle) {
 	std::vector<std::string> renderAssetSplit = GeneralUtils::SplitString(renderAsset, '/');
 	if (renderAssetSplit.empty()) return;
 
-	std::string lxfmlPath = "BrickModels" + lxfmlFolderName + "/" + GeneralUtils::SplitString(renderAssetSplit.back(), '.').at(0) + ".lxfml";
+	const auto renderAssetSplitSplit = GeneralUtils::SplitString(renderAssetSplit.back(), '.');
+	if (renderAssetSplitSplit.empty()) return;
+
+	std::string lxfmlPath = "BrickModels" + lxfmlFolderName + "/" + renderAssetSplitSplit[0] + ".lxfml";
 	auto file = Game::assetManager->GetFile(lxfmlPath.c_str());
 
 	if (!file) {
@@ -536,18 +531,12 @@ void Item::RemoveFromInventory() {
 
 Item::~Item() {
 	delete preconditions;
-
-	for (auto* value : config) {
-		delete value;
-	}
-
-	config.clear();
 }
 
 void Item::SaveConfigXml(tinyxml2::XMLElement& i) const {
 	tinyxml2::XMLElement* x = nullptr;
 
-	for (const auto* config : this->config) {
+	for (const auto& config : config.values | std::views::values) {
 		const auto& key = GeneralUtils::UTF16ToWTF8(config->GetKey());
 		const auto saveKey = ExtraSettingAbbreviations.find(key);
 		if (saveKey == ExtraSettingAbbreviations.end()) {
@@ -567,11 +556,35 @@ void Item::LoadConfigXml(const tinyxml2::XMLElement& i) {
 	const auto* x = i.FirstChildElement("x");
 	if (!x) return;
 
-	for (const auto& pair : ExtraSettingAbbreviations) {
-		const auto* data = x->Attribute(pair.second.c_str());
+	for (const auto& [fullName, abbreviation] : ExtraSettingAbbreviations) {
+		const auto* data = x->Attribute(abbreviation.c_str());
 		if (!data) continue;
 
-		const auto value = pair.first + "=" + data;
-		config.push_back(LDFBaseData::DataFromString(value));
+		config.ParseInsert(fullName + "=" + data);
 	}
+}
+
+LWOOBJID Item::GenerateID() {
+	auto* const inventoryComponent = inventory->GetComponent();
+	const bool isPlayer = inventoryComponent->GetParent()->IsPlayer();
+	LWOOBJID id{};
+
+	// Only players and non-proxy items get persistent IDs (since they are the only ones that will persist between worlds)
+	if (isPlayer && parent == LWOOBJID_EMPTY) {
+		id = ObjectIDManager::GetPersistentID();
+	} else {
+		id = ObjectIDManager::GenerateObjectID();
+		GeneralUtils::SetBit(id, eObjectBits::SPAWNED);
+		GeneralUtils::SetBit(id, eObjectBits::CLIENT);
+	}
+
+	LOG("Parent %llu lot %u Generated id %u:%llu", parent, GetLot(), static_cast<uint32_t>(id), id);
+	const auto type = static_cast<eItemType>(info->itemType);
+
+	if (type == eItemType::MOUNT) {
+		GeneralUtils::SetBit(id, eObjectBits::CLIENT);
+	}
+
+	this->id = id;
+	return id;
 }

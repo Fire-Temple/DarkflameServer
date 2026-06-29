@@ -4,7 +4,9 @@
 class NjFireRocks : public CppScripts::Script
 {
 public:
-	void OnStartup(Entity* self) override;
 
-	void OnTimerDone(Entity* self, std::string timerName) override;
+	void OnStartup(Entity* self) override;
+	
+	void OnWaypointReached(Entity* self, uint32_t waypointIndex) override;
+
 };

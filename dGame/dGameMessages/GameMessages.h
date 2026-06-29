@@ -13,11 +13,12 @@
 #include "Brick.h"
 #include "MessageType/Game.h"
 #include "eGameMasterLevel.h"
+#include "LDFFormat.h"
 
 class AMFBaseValue;
+class AMFArrayValue;
 class Entity;
 class Item;
-class NiQuaternion;
 class User;
 class Leaderboard;
 class PropertySelectQueryProperty;
@@ -43,6 +44,7 @@ enum class eQuickBuildState : uint32_t;
 enum class BehaviorSlot : int32_t;
 enum class eVendorTransactionResult : uint32_t;
 enum class eReponseMoveItemBetweenInventoryTypeCode : int32_t;
+enum class eMissionState : int;
 
 enum class eCameraTargetCyclingMode : int32_t {
 	ALLOW_CYCLE_TEAMMATES,
@@ -57,6 +59,7 @@ namespace GameMessages {
 
 		// Sends a message to the entity manager to route to the target
 		bool Send();
+		bool Send(const LWOOBJID _target);
 
 		// Sends the message to the specified client or
 		// all clients if UNASSIGNED_SYSTEM_ADDRESS is specified
@@ -103,7 +106,9 @@ namespace GameMessages {
 	void SendStartPathing(Entity* entity);
 	void SendPlatformResync(Entity* entity, const SystemAddress& sysAddr, bool bStopAtDesiredWaypoint = false,
 		int iIndex = 0, int iDesiredWaypointIndex = 1, int nextIndex = 1,
-		eMovementPlatformState movementState = eMovementPlatformState::Moving);
+		eMovementPlatformState movementState = eMovementPlatformState::Moving, 
+		float fPercentBetweenPoints = 0.0f, float fIdleTimeElapsed = 0.0f, 
+		float fMoveTimeElapsed = 0.0f, bool bReverse = false);
 
 	void SendResetMissions(Entity* entity, const SystemAddress& sysAddr, const int32_t missionid = -1);
 	void SendRestoreToPostLoadStats(Entity* entity, const SystemAddress& sysAddr);
@@ -152,7 +157,6 @@ namespace GameMessages {
 	void SendStop2DAmbientSound(Entity* entity, bool force, std::string audioGUID, bool result = false);
 	void SendPlay2DAmbientSound(Entity* entity, std::string audioGUID, bool result = false);
 	void SendSetNetworkScriptVar(Entity* entity, const SystemAddress& sysAddr, std::string data);
-	void SendDropClientLoot(Entity* entity, const LWOOBJID& sourceID, LOT item, int currency, NiPoint3 spawnPos = NiPoint3Constant::ZERO, int count = 1);
 
 	void SendSetPlayerControlScheme(Entity* entity, eControlScheme controlScheme);
 	void SendPlayerReachedRespawnCheckpoint(Entity* entity, const NiPoint3& position, const NiQuaternion& rotation);
@@ -242,8 +246,6 @@ namespace GameMessages {
 		bool addImmunity = false, bool cancelOnDamaged = false, bool cancelOnDeath = true,
 		bool cancelOnLogout = false, bool cancelOnRemoveBuff = true, bool cancelOnUi = false,
 		bool cancelOnUnequip = false, bool cancelOnZone = false, bool addedByTeammate = false, bool applyOnTeammates = false, const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
-
-	void SendToggleGMInvis(LWOOBJID objectId, bool enabled, const SystemAddress& sysAddr);
 
 	void SendSetName(LWOOBJID objectID, std::u16string name, const SystemAddress& sysAddr);
 
@@ -713,7 +715,7 @@ namespace GameMessages {
 		bool translate{};
 		int32_t time{};
 		std::u16string id{};
-		std::vector<LDFBaseData*> localizeParams{};
+		LwoNameValue localizeParams{};
 		std::u16string imageName{};
 		std::u16string text{};
 		void Serialize(RakNet::BitStream& bitStream) const override;
@@ -736,7 +738,7 @@ namespace GameMessages {
 
 	struct ConfigureRacingControl : public GameMsg {
 		ConfigureRacingControl() : GameMsg(MessageType::Game::CONFIGURE_RACING_CONTROL) {}
-		std::vector<std::unique_ptr<LDFBaseData>> racingSettings{};
+		LwoNameValue racingSettings{};
 	};
 
 	struct SetModelToBuild : public GameMsg {
@@ -756,7 +758,7 @@ namespace GameMessages {
 	struct ActivityNotify : public GameMsg {
 		ActivityNotify() : GameMsg(MessageType::Game::ACTIVITY_NOTIFY) {}
 
-		std::vector<std::unique_ptr<LDFBaseData>> notification{};
+		LwoNameValue notification{};
 	};
 
 	struct ShootingGalleryFire : public GameMsg {
@@ -765,7 +767,7 @@ namespace GameMessages {
 		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
 
 		NiPoint3 target{};
-		NiQuaternion rotation{};
+		NiQuaternion rotation = QuatUtils::IDENTITY;
 	};
 
 	struct ChildLoaded : public GameMsg {
@@ -787,6 +789,15 @@ namespace GameMessages {
 		RequestServerObjectInfo() : GameMsg(MessageType::Game::REQUEST_SERVER_OBJECT_INFO, eGameMasterLevel::DEVELOPER) {}
 		bool Deserialize(RakNet::BitStream& bitStream) override;
 		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
+	};
+
+	struct GetObjectReportInfo : public GameMsg {
+		AMFArrayValue* info{};
+		AMFArrayValue* subCategory{};
+		bool bVerbose{};
+		LWOOBJID clientID{};
+
+		GetObjectReportInfo() : GameMsg(MessageType::Game::GET_OBJECT_REPORT_INFO, eGameMasterLevel::DEVELOPER) {}
 	};
 
 	struct RequestUse : public GameMsg {
@@ -839,13 +850,18 @@ namespace GameMessages {
 
 	struct ResetModelToDefaults : public GameMsg {
 		ResetModelToDefaults() : GameMsg(MessageType::Game::RESET_MODEL_TO_DEFAULTS) {}
+
+		bool bResetPos{ true };
+		bool bResetRot{ true };
+		bool bUnSmash{ true };
+		bool bResetBehaviors{ true };
 	};
 
 	struct EmotePlayed : public GameMsg {
 		EmotePlayed() : GameMsg(MessageType::Game::EMOTE_PLAYED), emoteID(0), targetID(0) {}
-	
+
 		void Serialize(RakNet::BitStream& stream) const override;
-	
+
 		int32_t emoteID;
 		LWOOBJID targetID;
 	};
@@ -854,6 +870,107 @@ namespace GameMessages {
 		GetPosition() : GameMsg(MessageType::Game::GET_POSITION) {}
 
 		NiPoint3 pos{};
+	};
+
+	struct SetFaction : public GameMsg {
+		SetFaction() : GameMsg(MessageType::Game::SET_FACTION) {}
+
+		int32_t factionID{};
+
+		bool bIgnoreChecks{ false };
+	};
+
+	struct DropClientLoot : public GameMsg {
+		DropClientLoot() : GameMsg(MessageType::Game::DROP_CLIENT_LOOT) {}
+
+		void Serialize(RakNet::BitStream& stream) const override;
+		LWOOBJID sourceID{ LWOOBJID_EMPTY };
+		LOT item{ LOT_NULL };
+		int32_t currency{};
+		NiPoint3 spawnPos{};
+		NiPoint3 finalPosition{};
+		int32_t count{};
+		bool bUsePosition{};
+		LWOOBJID lootID{ LWOOBJID_EMPTY };
+		LWOOBJID ownerID{ LWOOBJID_EMPTY };
+	};
+
+	struct GetMissionState : public GameMsg {
+		GetMissionState() : GameMsg(MessageType::Game::GET_MISSION_STATE) {}
+
+		int32_t missionID{};
+		eMissionState missionState{};
+		bool cooldownInfoRequested{};
+		bool cooldownFinished{};
+	};
+
+	struct GetFlag : public GameMsg {
+		GetFlag() : GameMsg(MessageType::Game::GET_FLAG) {}
+
+		uint32_t flagID{};
+		bool flag{};
+	};
+
+	struct GetFactionTokenType : public GameMsg {
+		GetFactionTokenType() : GameMsg(MessageType::Game::GET_FACTION_TOKEN_TYPE) {}
+
+		LOT tokenType{ LOT_NULL };
+	};
+
+	struct MissionNeedsLot : public GameMsg {
+		MissionNeedsLot() : GameMsg(MessageType::Game::MISSION_NEEDS_LOT) {}
+
+		LOT item{};
+	};
+
+	struct PickupItem : public GameMsg {
+		PickupItem() : GameMsg(MessageType::Game::PICKUP_ITEM) {}
+
+		void Handle(Entity& entity, const SystemAddress& sysAddr) override;
+		bool Deserialize(RakNet::BitStream& stream) override;
+		LWOOBJID lootID{};
+		LWOOBJID lootOwnerID{};
+	};
+
+	struct TeamPickupItem : public GameMsg {
+		TeamPickupItem() : GameMsg(MessageType::Game::TEAM_PICKUP_ITEM) {}
+
+		void Serialize(RakNet::BitStream& stream) const override;
+		LWOOBJID lootID{};
+		LWOOBJID lootOwnerID{};
+	};
+
+	struct IsDead : public GameMsg {
+		IsDead() : GameMsg(MessageType::Game::IS_DEAD) {}
+
+		bool bDead{};
+	};
+
+	struct ToggleGMInvis : public GameMsg {
+		ToggleGMInvis() : GameMsg(MessageType::Game::TOGGLE_GM_INVIS) {}
+
+		void Serialize(RakNet::BitStream& stream) const override;
+		bool bStateOut{ false };
+
+	};
+
+	struct GetGMInvis : public GameMsg {
+		GetGMInvis() : GameMsg(MessageType::Game::GET_GM_INVIS) {}
+
+		bool bGMInvis{ false };
+  };
+
+	struct ChildRemoved : public GameMsg {
+		ChildRemoved() : GameMsg(MessageType::Game::CHILD_REMOVED) {}
+
+		LWOOBJID childID{};
+	};
+
+	struct ObjectLoaded : public GameMsg {
+		ObjectLoaded() : GameMsg(MessageType::Game::OBJECT_LOADED) {}
+
+		LWOOBJID objectID{};
+		LOT lot{};
 	};
 };
 #endif // GAMEMESSAGES_H

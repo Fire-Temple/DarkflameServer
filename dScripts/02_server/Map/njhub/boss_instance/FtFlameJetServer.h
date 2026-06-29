@@ -7,19 +7,9 @@ public:
 	void OnStartup(Entity* self) override;
 
 	void OnCollisionPhantom(Entity* self, Entity* target) override;
-
-	void SpawnLegs(Entity* self);
-
-	void OnChildLoaded(Entity* self, Entity* child);
-
-	void NotifyDie(Entity* self, Entity* other, Entity* killer);
-
-	void OnChildRemoved(Entity* self, Entity* child);
+	
+	void OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1, int32_t param2) override;
 
 	void OnTimerDone(Entity* self, std::string timerName) override;
-
-private:
-
-	int SharedInt;
 
 };
