@@ -866,15 +866,16 @@ void Entity::Initialize() {
 			this->m_ParentEntity->OnChildLoaded(childLoaded);
 		}
 		
-		// Setup moving platforms after OnStartup had a chance to modify values
-		if (path && path->pathType == PathType::MovingPlatform) {
-			auto* movingPlatformComponent = GetComponent<MovingPlatformComponent>();
+		// Start moving platforms after OnStartup had a chance to modify values
+		// * if we need to start pathing on load
+		auto* movingPlatformComponent = GetComponent<MovingPlatformComponent>();
+		if (movingPlatformComponent != nullptr && !movingPlatformComponent->m_NoAutoStart) {
 			
-			// force a resync
-			// if (GetVar<bool>(u"platformStartAtEnd")) movingPlatformComponent->Resync();
+			if ((path && path->pathType == PathType::MovingPlatform))
+				movingPlatformComponent->StartPathing();
 
-			// if we need to start pathing on load
-			if (!movingPlatformComponent->m_NoAutoStart) movingPlatformComponent->StartPathing();
+			else if (GetVar<bool>(u"platformIsSimpleMover"))
+				movingPlatformComponent->SimpleMove(false); // no reason to serialize
 		}
 	});
 

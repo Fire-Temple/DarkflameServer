@@ -199,10 +199,8 @@ void EntityManager::DestroyEntity(Entity* entity) {
 }
 
 void EntityManager::SerializeEntities() {
-	for (size_t i = 0; i < m_EntitiesToSerialize.size(); i++) {
-		const LWOOBJID toSerialize = m_EntitiesToSerialize[i];
-		auto* entity = GetEntity(toSerialize);
-
+	for (const auto& pending : m_EntitiesToSerialize) {
+		auto* entity = GetEntity(pending.objectID);
 		if (!entity) continue;
 
 		m_SerializationCounter++;
@@ -214,16 +212,19 @@ void EntityManager::SerializeEntities() {
 		entity->WriteBaseReplicaData(stream, eReplicaPacketType::SERIALIZATION);
 		entity->WriteComponents(stream, eReplicaPacketType::SERIALIZATION);
 
-		if (entity->GetIsGhostingCandidate()) {
-			for (auto* player : PlayerManager::GetAllPlayers()) {
-				auto* ghostComponent = player->GetComponent<GhostComponent>();
-				if (ghostComponent && ghostComponent->IsObserved(toSerialize)) {
-					Game::server->Send(stream, player->GetSystemAddress(), false);
+		// global entity change
+		if (pending.systemAddress == UNASSIGNED_SYSTEM_ADDRESS) {
+			if (entity->GetIsGhostingCandidate()) {
+				for (auto* player : PlayerManager::GetAllPlayers()) {
+					auto* ghostComponent = player->GetComponent<GhostComponent>();
+					if (ghostComponent && ghostComponent->IsObserved(pending.objectID))
+						Game::server->Send(stream, player->GetSystemAddress(), false);
 				}
-			}
-		} else {
-			Game::server->Send(stream, UNASSIGNED_SYSTEM_ADDRESS, true);
-		}
+				
+			} else Game::server->Send(stream, UNASSIGNED_SYSTEM_ADDRESS, true);
+
+		// client specific entity change
+		} else Game::server->Send(stream, pending.systemAddress, false);
 	}
 	m_EntitiesToSerialize.clear();
 }
@@ -451,17 +452,25 @@ void EntityManager::DestructEntity(Entity* entity, const SystemAddress& sysAddr)
 	}
 }
 
-void EntityManager::SerializeEntity(Entity* entity) {
+void EntityManager::SerializeEntity(Entity* entity, const SystemAddress& sysAddr) {
 	if (!entity) return;
 
-	EntityManager::SerializeEntity(*entity);
+	EntityManager::SerializeEntity(*entity, sysAddr);
 }
 
-void EntityManager::SerializeEntity(const Entity& entity) {
+void EntityManager::SerializeEntity(const Entity& entity, const SystemAddress& sysAddr) {
 	if (entity.GetNetworkId() == 0) return;
 
-	if (std::find(m_EntitiesToSerialize.cbegin(), m_EntitiesToSerialize.cend(), entity.GetObjectID()) == m_EntitiesToSerialize.cend()) {
-		m_EntitiesToSerialize.push_back(entity.GetObjectID());
+	auto it = std::find_if(
+		m_EntitiesToSerialize.cbegin(),
+		m_EntitiesToSerialize.cend(),
+		[&](const PendingSerialization& pending) {
+			return pending.objectID == entity.GetObjectID() && pending.systemAddress == sysAddr;
+		});
+
+	if (it == m_EntitiesToSerialize.cend()) {
+		PendingSerialization pending{entity.GetObjectID(), sysAddr};
+		m_EntitiesToSerialize.push_back(pending);
 	}
 }
 

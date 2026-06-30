@@ -4929,6 +4929,7 @@ void GameMessages::HandleRequestPlatformResync(RakNet::BitStream& inStream, Enti
 	// do we have a simple mover?
 	} else if (entity->GetVar<bool>(u"platformIsSimpleMover")) {
 		LOG_DEBUG("Requested resync for a simple mover, what should we do?");
+		movingPlatformComponent->Resync(sysAddr);
 
 	} else if (subComponent->mLastWaypointIndex == 1 && subComponent->mCurrentWaypointIndex == 1 && entity->GetVar<bool>(u"platformStartAtEnd")) {	
 		// send	a smooth transition for these		

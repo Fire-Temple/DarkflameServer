@@ -48,8 +48,8 @@ public:
 
 	void ConstructEntity(Entity* entity, const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
 	void DestructEntity(Entity* entity, const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
-	void SerializeEntity(Entity* entity);
-	void SerializeEntity(const Entity& entity);
+	void SerializeEntity(Entity* entity, const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
+	void SerializeEntity(const Entity& entity, const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
 
 	void ConstructAllEntities(const SystemAddress& sysAddr);
 	void DestructAllEntities(const SystemAddress& sysAddr);
@@ -95,10 +95,16 @@ private:
 	static std::vector<LWOMAPID> m_GhostingExcludedZones;
 	static std::vector<LOT> m_GhostingExcludedLOTs;
 
+	// for entity serializing
+    struct PendingSerialization {
+        LWOOBJID objectID;
+        SystemAddress systemAddress;
+    };	
+
 	std::unordered_map<LWOOBJID, Entity*> m_Entities;
 	std::vector<LWOOBJID> m_EntitiesToKill;
 	std::vector<LWOOBJID> m_EntitiesToDelete;
-	std::vector<LWOOBJID> m_EntitiesToSerialize;
+	std::vector<PendingSerialization> m_EntitiesToSerialize;
 	std::vector<Entity*> m_EntitiesToGhost;
 	std::vector<LWOOBJID> m_PlayersToUpdateGhosting;
 	Entity* m_ZoneControlEntity;

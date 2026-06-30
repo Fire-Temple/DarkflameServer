@@ -44,27 +44,45 @@ MoverSubComponent::MoverSubComponent(const NiPoint3& startPos) {
 MoverSubComponent::~MoverSubComponent() = default;
 
 void MoverSubComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate, bool simpleMover, NiPoint3 simpleMoverPos, NiQuaternion simpleMoverRot) {
-	outBitStream.Write<bool>(true);
+	outBitStream.Write<bool>(true); // has mover info
 
-	if (simpleMover) {		
+	if (simpleMover) {
+	// -- LOCATION INFO --
+		outBitStream.Write<bool>(true); // has location info
+	
+		// position
 		outBitStream.Write<float_t>(simpleMoverPos.x);
 		outBitStream.Write<float_t>(simpleMoverPos.y);
 		outBitStream.Write<float_t>(simpleMoverPos.z);
 
+		// rotation
 		outBitStream.Write<float_t>(simpleMoverRot.w);
 		outBitStream.Write<float_t>(simpleMoverRot.x);
 		outBitStream.Write<float_t>(simpleMoverRot.y);
-		outBitStream.Write<float_t>(simpleMoverRot.z);		
+		outBitStream.Write<float_t>(simpleMoverRot.z);
+		
+	// -- EXTRA INFO --	
+		outBitStream.Write<bool>(true); // has extra info
 
+		// movement state
 		outBitStream.Write(mState);
 
 		// starting waypoint
-		outBitStream.Write<uint32_t>(0);
+		outBitStream.Write<uint32_t>(mCurrentWaypointIndex);
 
 		// isInReverse
-		outBitStream.Write<bool>(false);
+		outBitStream.Write<bool>(mInReverse);
 		
-		LOG_DEBUG("simpleMover data serialized");
+		LOG_DEBUG(
+			"simpleMover data serialized: "
+			"hasExtraInfo=true "
+			"state=%d "
+			"currentWaypoint=%u "
+			"inReverse=%s",
+			mState,
+			mCurrentWaypointIndex,
+			mInReverse ? "true" : "false"
+		);
 
 	} else {	
 
@@ -90,43 +108,59 @@ void MoverSubComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsIniti
 //------------- MovingPlatformComponent below --------------
 
 MovingPlatformComponent::MovingPlatformComponent(Entity* parent, const int32_t componentID, const std::string& pathName) : Component(parent, componentID) {
-	// do we have a simple mover?
-	if (m_Parent->GetVar<bool>(u"platformIsSimpleMover"))
-		m_MoverSubComponentType = eMoverSubComponentType::simpleMover;
-	else 
-		m_MoverSubComponentType = eMoverSubComponentType::mover;
-	
+	// create submover
 	m_MoverSubComponent = new MoverSubComponent(m_Parent->GetDefaultPosition());
-	m_PathName = GeneralUtils::ASCIIToUTF16(pathName);
-	m_Path = Game::zoneManager->GetZone()->GetPath(pathName);
-	
 	auto* subComponent = static_cast<MoverSubComponent*>(m_MoverSubComponent);
-	
-	m_TimeBased = false;
-	if (m_Path && m_Path->pathType == PathType::MovingPlatform)
-		m_TimeBased = static_cast<bool>(m_Path->movingPlatform.timeBasedMovement);
-
 
 	// sounds
 	subComponent->mStartGUID = GeneralUtils::UTF16ToWTF8(m_Parent->GetVar<std::u16string>(u"platformSoundStart"));
 	subComponent->mStopGUID = GeneralUtils::UTF16ToWTF8(m_Parent->GetVar<std::u16string>(u"platformSoundStop"));
 	subComponent->mTravelGUID = GeneralUtils::UTF16ToWTF8(m_Parent->GetVar<std::u16string>(u"platformSoundTravel"));
+	
+	// start pathing on load
+	m_NoAutoStart = !m_Parent->GetVar<bool>(u"startPathingOnLoad");
+
+	// do we have a simple mover?
+	if (m_Parent->GetVar<bool>(u"platformIsSimpleMover")) {	
+		m_MoverSubComponentType = eMoverSubComponentType::simpleMover;	
+		m_TimeBased = true;
+		
+		subComponent->mPosition = m_Parent->GetPosition();
+		subComponent->mRotation = m_Parent->GetRotation();
+		
+		// 2 point path
+		if (m_Parent->GetVar<bool>(u"platformStartAtEnd")) {
+			SimpleMovePrepareForward(false);
+		} else {
+			SimpleMovePrepareForward(true);
+		}
+
+		return;	
+		
+	} else m_MoverSubComponentType = eMoverSubComponentType::mover;
+
+	m_PathName = GeneralUtils::ASCIIToUTF16(pathName);
+	m_Path = Game::zoneManager->GetZone()->GetPath(pathName);
+
+	m_TimeBased = false;
+	if (m_Path && m_Path->pathType == PathType::MovingPlatform)
+		m_TimeBased = static_cast<bool>(m_Path->movingPlatform.timeBasedMovement);
 
 	if (m_Path != nullptr) {
 		subComponent->mLastWaypointIndex = GetLastWaypointIndex();
 		if (m_Parent->GetVar<bool>(u"platformStartAtEnd")) {
 			// get last waypoint
 			const auto& lastWaypoint = m_Path->pathWaypoints[GetLastWaypointIndex()];
-			
+
 			subComponent->mInReverse = true;
-			
+
 			subComponent->mPosition = lastWaypoint.position;
 			subComponent->mRotation = lastWaypoint.rotation;
 			subComponent->mCurrentWaypointIndex = GetLastWaypointIndex();
 			subComponent->mNextWaypointIndex = GetLastWaypointIndex() - 1;
-			
+
 			// StartPathing handles this
-//			if (m_Path->pathBehavior == PathBehavior::Once) subComponent->mDesiredWaypointIndex = 0;	
+//			if (m_Path->pathBehavior == PathBehavior::Once) subComponent->mDesiredWaypointIndex = 0;
 
 
 		} else if (m_Parent->HasVar(u"attached_path_start")) {
@@ -142,7 +176,7 @@ MovingPlatformComponent::MovingPlatformComponent(Entity* parent, const int32_t c
 					} else {
 						subComponent->mNextWaypointIndex = 0;				
 					}
-					
+
 				} else {
 					subComponent->mNextWaypointIndex = start + 1;
 				}
@@ -151,25 +185,25 @@ MovingPlatformComponent::MovingPlatformComponent(Entity* parent, const int32_t c
 		auto arriveSound = static_cast<std::string>(m_Path->pathWaypoints[subComponent->mCurrentWaypointIndex].movingPlatform.arriveSound);
 		auto travelSound = static_cast<std::string>(m_Path->movingPlatform.platformTravelSound);
 		auto departSound = static_cast<std::string>(m_Path->pathWaypoints[subComponent->mCurrentWaypointIndex].movingPlatform.departSound);		
-	
+
 		if (!arriveSound.empty())
 			subComponent->mStopGUID = arriveSound;
 		if (!travelSound.empty()) 
 			subComponent->mTravelGUID = travelSound;
 		if (!departSound.empty())
 			subComponent->mStartGUID = departSound;
-		
+
 	} else {
 		LOG_DEBUG("Path not found: %s", pathName.c_str());
 		LOG_DEBUG("using m_Parent position and rotation");
 		subComponent->mPosition = m_Parent->GetPosition();
 		subComponent->mRotation = m_Parent->GetRotation();
 	}
-	
-	m_NoAutoStart = !m_Parent->GetVar<bool>(u"startPathingOnLoad");
+
+
 	// if we serlialize later, clients should not start pathing without server
 	//	m_NoAutoStart = true;
-	
+
 }
 
 MovingPlatformComponent::~MovingPlatformComponent() {
@@ -185,6 +219,7 @@ void MovingPlatformComponent::Serialize(RakNet::BitStream& outBitStream, bool bI
 
 		return;
 	}
+
 
 	outBitStream.Write<bool>(true);
 
@@ -217,7 +252,7 @@ void MovingPlatformComponent::Serialize(RakNet::BitStream& outBitStream, bool bI
 		if (m_MoverSubComponentType == eMoverSubComponentType::simpleMover) {
 			// TODO
 			LOG_DEBUG("attempt serialize a simpleMover");
-			mover->Serialize(outBitStream, bIsInitialUpdate);
+			// mover->Serialize(outBitStream, bIsInitialUpdate);
 			mover->Serialize(outBitStream, bIsInitialUpdate, true, m_Parent->GetPosition(), m_Parent->GetRotation());
 		} else {
 			mover->Serialize(outBitStream, bIsInitialUpdate);
@@ -230,8 +265,7 @@ void MovingPlatformComponent::OnQuickBuildInitilized() {
 }
 
 void MovingPlatformComponent::OnCompleteQuickBuild() {
-	if (m_NoAutoStart)
-		return;
+	if (m_NoAutoStart) return;
 
 	StartPathing();
 }
@@ -239,16 +273,28 @@ void MovingPlatformComponent::OnCompleteQuickBuild() {
 void MovingPlatformComponent::GotoWaypoint(uint32_t index, bool stopAtWaypoint, bool immediate) {
     auto* subComponent = static_cast<MoverSubComponent*>(m_MoverSubComponent);
 
-	int32_t originalCurrentWaypoint = subComponent->mCurrentWaypointIndex;
-	float currentPercent = subComponent->mPercentBetweenPoints;
-	uint32_t lastIndex = GetLastWaypointIndex();
-
 	// do we have a simple mover?
 	if (m_Parent->GetVar<bool>(u"platformIsSimpleMover")) {		
-		LOG_DEBUG("GotoWaypoint called on a simple mover");	
+		LOG_DEBUG("GotoWaypoint called on a simple mover");
+		if (index == subComponent->mCurrentWaypointIndex) {
+			LOG_DEBUG("simple mover already at desired waypoint");
+			return;
+			
+		} else if (subComponent->mState == eMovementPlatformState::Moving)
+			return; // only one place to go :)
+		else if (index == 0) 
+			SimpleMovePrepareForward(false);
+		else 
+			SimpleMovePrepareForward(true);
+
 		SimpleMove();
 		return;
 	}
+	
+	
+	int32_t originalCurrentWaypoint = subComponent->mCurrentWaypointIndex;
+	float currentPercent = subComponent->mPercentBetweenPoints;
+	uint32_t lastIndex = GetLastWaypointIndex();	
 
 	if (subComponent->mShouldStopAtDesiredWaypoint != stopAtWaypoint) {
 		subComponent->mShouldStopAtDesiredWaypoint = stopAtWaypoint;
@@ -635,40 +681,60 @@ void MovingPlatformComponent::StopPathing(bool immediate) {
 	Resync();
 }
 
-void MovingPlatformComponent::SimpleMove() {
+void MovingPlatformComponent::SimpleMove(bool serialize) {
 	auto* subComponent = static_cast<MoverSubComponent*>(m_MoverSubComponent);
+	auto moveTime = m_Parent->GetVar<float>(u"platformMoveTime");
 	
-	auto waitTime = m_Parent->GetVar<float>(u"platformMoveTime");
-	
-	// TODO: these actually need to be relative to entity's rotation
-	// however, since the counterweights are top side up, it wont matter
+	// client already pulls these, just here for reference
 	auto moveX = m_Parent->GetVar<float>(u"platformMoveX");
 	auto moveY = m_Parent->GetVar<float>(u"platformMoveY");
 	auto moveZ = m_Parent->GetVar<float>(u"platformMoveZ");
-	NiPoint3 targetPosition = m_Parent->GetPosition() + NiPoint3(moveX, moveY, moveZ);
 	
-	subComponent->mState = eMovementPlatformState::Moving;
-	
-	// simpleMover does not seem to work still, remove this if fixed
-	m_Parent->SetPosition(targetPosition);
+	subComponent->mState = eMovementPlatformState::Moving;	
 	
 	// we can just re-serialize now
-	Game::entityManager->SerializeEntity(m_Parent);
+	if (serialize) {
+		m_Serialize = true;
+		Game::entityManager->SerializeEntity(m_Parent);
+	}
 	
 	// send starting sounds
-	StartSounds(true);	
+	StartSounds(true);
 	
 	// Timer for waypoint reached
-    m_Parent->AddCallbackTimer(waitTime, [this, subComponent] {	
-
+    m_Parent->AddCallbackTimer(moveTime, [this, subComponent] {
+		// probably not needed
+		// m_Serialize = false;
+		
 		// send stopping sounds
 		StartSounds(false);	
 		
 		subComponent->mState = eMovementPlatformState::Stationary;
+		
+		if (subComponent->mCurrentWaypointIndex == 0)
+			SimpleMovePrepareForward(false);
+		else
+			SimpleMovePrepareForward(true);
 
 		// for scripting
 		this->m_Parent->GetScript()->OnWaypointReached(m_Parent, subComponent->mCurrentWaypointIndex);	
 	}, simpleMove_callbackId);
+}
+
+void MovingPlatformComponent::SimpleMovePrepareForward(bool forward) {
+	auto* subComponent = static_cast<MoverSubComponent*>(m_MoverSubComponent);
+	
+	if (forward) {
+		subComponent->mCurrentWaypointIndex = 0;
+		subComponent->mNextWaypointIndex = 1;
+		subComponent->mInReverse = false;		
+	} else {
+		subComponent->mCurrentWaypointIndex = 1;
+		subComponent->mNextWaypointIndex = 0;
+		subComponent->mInReverse = true;		
+	}
+
+	subComponent->mDesiredWaypointIndex = subComponent->mNextWaypointIndex;
 }
 
 float MovingPlatformComponent::CalculateDistance() {
@@ -679,14 +745,10 @@ float MovingPlatformComponent::CalculateDistance() {
 	float elapsed = std::chrono::duration<float>(now - subComponent->mLegStartTime).count();
 	
 
-	// wouldn't be my kinda code w/o shit like this :D
-	// helps with repeated calls (earth garden pillars), but could be noticeable over long distances
-//	if (lot == 14447 || lot == 14449) {
-//		if (!subComponent->mInReverse)
-//			elapsed = elapsed * 1.1f;
-//		else
-//			elapsed = elapsed * 0.9f;
-//	}
+	// !! IMPORTANT !!
+	// we might need to calculate distance squared depending on how
+	// Vector3::Distance() is calculated. Remembered after the fact but no time to verify this
+	// PLEASE DO THIS SOON!!!
 	
 
 	float distance = elapsed * subComponent->mSpeed;
@@ -716,7 +778,7 @@ float MovingPlatformComponent::CalculatePercent() {
 
 void MovingPlatformComponent::Resync(const SystemAddress& sysAddr) {
 	auto* subComponent = static_cast<MoverSubComponent*>(m_MoverSubComponent);
-	
+
 //	LOG_DEBUG("SendPlatformResync called for object id %llu with LOT %i -> current=%u next=%u desired=%u percent=%.3f state=%d",
 //		m_Parent->GetObjectID(),
 //		m_Parent->GetLOT(),
@@ -725,21 +787,26 @@ void MovingPlatformComponent::Resync(const SystemAddress& sysAddr) {
 //      subComponent->mDesiredWaypointIndex,
 //      subComponent->mPercentBetweenPoints,
 //      subComponent->mState);
-	
-    GameMessages::SendPlatformResync(
-        m_Parent,
-        sysAddr,
-        true,
-        subComponent->mCurrentWaypointIndex,
-        subComponent->mNextWaypointIndex,
-        subComponent->mNextWaypointIndex,
-        subComponent->mState,
-        subComponent->mPercentBetweenPoints,
-		subComponent->mWaitTime,
-		subComponent->mLegDistanceProgress / subComponent->mSpeed,		
-		subComponent->mInReverse);	
 
-	
+	if (m_MoverSubComponentType == eMoverSubComponentType::simpleMover) {
+		// we can just re-serialize for the specific player
+		m_Serialize = true;
+		Game::entityManager->SerializeEntity(m_Parent, sysAddr);
+
+	} else {
+		GameMessages::SendPlatformResync(
+			m_Parent,
+			sysAddr,
+			true,
+			subComponent->mCurrentWaypointIndex,
+			subComponent->mNextWaypointIndex,
+			subComponent->mNextWaypointIndex,
+			subComponent->mState,
+			subComponent->mPercentBetweenPoints,
+			subComponent->mWaitTime,
+			subComponent->mLegDistanceProgress / subComponent->mSpeed,		
+			subComponent->mInReverse);	
+	}
 }
 
 void MovingPlatformComponent::StartSounds(bool starting) {
@@ -777,15 +844,20 @@ void MovingPlatformComponent::SetNoAutoStart(const bool value) {
 	m_NoAutoStart = value;
 }
 
-void MovingPlatformComponent::WarpToWaypoint(size_t index) {
-	const auto& waypoint = m_Path->pathWaypoints[index];
+eMoverSubComponentType MovingPlatformComponent::GetSubMoverType() const {
+	return m_MoverSubComponentType;
+}
 
+void MovingPlatformComponent::WarpToWaypoint(size_t index) {
 	// Just pass it on
 	GotoWaypoint(index);
 }
 
 size_t MovingPlatformComponent::GetLastWaypointIndex() const {
-	return m_Path->pathWaypoints.size() - 1;
+	if (m_Parent->GetVar<bool>(u"platformIsSimpleMover"))
+		return 1;
+	else
+		return m_Path->pathWaypoints.size() - 1;
 }
 
 MoverSubComponent* MovingPlatformComponent::GetMoverSubComponent() const {

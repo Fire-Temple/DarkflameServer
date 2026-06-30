@@ -197,7 +197,12 @@ public:
 	/**
 	 * Starts pathing for simple movers (NJ)
 	 */
-	void SimpleMove();
+	void SimpleMove(bool serialize = true);
+	
+	/**
+	 * Prepares pathing direction for simple movers (NJ)
+	 */
+	void SimpleMovePrepareForward(bool forward = true);
 
 	/**
 	 * Turn time traveled into distance; always forward facing
@@ -236,6 +241,12 @@ public:
 	 * @param value the auto start value to set
 	 */
 	void SetNoAutoStart(bool value);
+	
+	/**
+	 * Returns eMoverSubComponentType of the platform
+	 * @return eMoverSubComponentType of the platform
+	 */
+	eMoverSubComponentType GetSubMoverType() const;
 
 	/**
 	 * Warps the platform to a waypoint index, skipping its current path
