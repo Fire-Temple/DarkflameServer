@@ -282,7 +282,7 @@
 #include "NjEarthPetServer.h"
 #include "NjDragonEmblemChestServer.h"
 #include "NjNyaMissionitems.h"
-#include "NjOldManNPC.h"
+#include "OldManNPC.h"
 
 // Scripted equipment
 #include "AnvilOfArmor.h"

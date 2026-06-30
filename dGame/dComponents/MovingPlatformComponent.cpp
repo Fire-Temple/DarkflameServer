@@ -73,16 +73,9 @@ void MoverSubComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsIniti
 		// isInReverse
 		outBitStream.Write<bool>(mInReverse);
 		
-		LOG_DEBUG(
-			"simpleMover data serialized: "
-			"hasExtraInfo=true "
-			"state=%d "
-			"currentWaypoint=%u "
-			"inReverse=%s",
-			mState,
-			mCurrentWaypointIndex,
-			mInReverse ? "true" : "false"
-		);
+		// LOG_DEBUG(
+			// "simpleMover data serialized: hasExtraInfo=true state=%d currentWaypoint=%u inReverse=%s",
+			// mState, mCurrentWaypointIndex, mInReverse ? "true" : "false");
 
 	} else {	
 
@@ -250,9 +243,6 @@ void MovingPlatformComponent::Serialize(RakNet::BitStream& outBitStream, bool bI
 		outBitStream.Write(m_MoverSubComponentType);
 
 		if (m_MoverSubComponentType == eMoverSubComponentType::simpleMover) {
-			// TODO
-			LOG_DEBUG("attempt serialize a simpleMover");
-			// mover->Serialize(outBitStream, bIsInitialUpdate);
 			mover->Serialize(outBitStream, bIsInitialUpdate, true, m_Parent->GetPosition(), m_Parent->GetRotation());
 		} else {
 			mover->Serialize(outBitStream, bIsInitialUpdate);
