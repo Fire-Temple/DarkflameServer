@@ -649,16 +649,7 @@ void Entity::Initialize() {
 			quickBuildComponent->SetTimeBeforeSmash(rebCompData[0].time_before_smash);
 
 			const auto rebuildResetTime = GetVar<float>(u"rebuild_reset_time");
-
-			if (rebuildResetTime != 0.0f) {
-				quickBuildComponent->SetResetTime(rebuildResetTime);
-
-				// Known bug with moving platform in FV that casues it to build at the end instead of the start.
-				// This extends the smash time so players can ride up the lift.
-				if (m_TemplateID == 9483) {
-					quickBuildComponent->SetResetTime(quickBuildComponent->GetResetTime() + 25);
-				}
-			}
+			if (rebuildResetTime != 0.0f) quickBuildComponent->SetResetTime(rebuildResetTime);
 
 			const auto activityID = GetVar<int32_t>(u"activityID");
 
@@ -869,7 +860,9 @@ void Entity::Initialize() {
 		// Start moving platforms after OnStartup had a chance to modify values
 		// * if we need to start pathing on load
 		auto* movingPlatformComponent = GetComponent<MovingPlatformComponent>();
-		if (movingPlatformComponent != nullptr && !movingPlatformComponent->m_NoAutoStart) {
+		auto* quickBuildComponent = GetComponent<QuickBuildComponent>();
+		if (movingPlatformComponent != nullptr && !movingPlatformComponent->m_NoAutoStart && 
+		(quickBuildComponent == nullptr || quickBuildComponent->GetState() == eQuickBuildState::COMPLETED)) {
 			
 			if ((path && path->pathType == PathType::MovingPlatform))
 				movingPlatformComponent->StartPathing();

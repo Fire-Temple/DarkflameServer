@@ -251,7 +251,8 @@ void MovingPlatformComponent::Serialize(RakNet::BitStream& outBitStream, bool bI
 }
 
 void MovingPlatformComponent::OnQuickBuildInitilized() {
-	StopPathing();
+	// include if needed
+	// StopPathing();
 }
 
 void MovingPlatformComponent::OnCompleteQuickBuild() {
