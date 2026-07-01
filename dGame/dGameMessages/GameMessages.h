@@ -972,5 +972,12 @@ namespace GameMessages {
 		LWOOBJID objectID{};
 		LOT lot{};
 	};
+	
+	struct NotifyCombatAIStateChange : public GameMsg {
+		NotifyCombatAIStateChange() : GameMsg(MessageType::Game::NOTIFY_COMBAT_AI_STATE_CHANGE) {}
+
+		AiState newState{};
+		AiState prevState{};
+	};
 };
 #endif // GAMEMESSAGES_H
