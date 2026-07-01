@@ -319,9 +319,9 @@ void Entity::Initialize() {
 			const auto& targetSceneName = m_Character->GetTargetScene();
 			auto* targetScene = Game::entityManager->GetSpawnPointEntity(targetSceneName);
 			
-			//If we came from another zone, put us in the starting loc					
-			if (m_Character->GetZoneID() != Game::server->GetZoneID() || mapID == 1603) { // Exception for Moon Base as you tend to spawn on the roof.
-
+			//If we came from another zone, put us in the starting loc
+			// Exception for Moon Base as you tend to spawn on the roof.
+			if (m_Character->GetZoneID() != Game::server->GetZoneID() || mapID == 1603 || !targetSceneName.empty()) {
 				NiPoint3 pos;
 				NiQuaternion rot;
 				
@@ -1813,13 +1813,13 @@ void Entity::CancelCallbackTimers(uint32_t id)
 {
     if (id == 0)
     {
-        // Cancel everything
+        // cancel everything
         m_CallbackTimers.clear();
         m_PendingCallbackTimers.clear();
         return;
     }
 
-    // Lambda to remove timers with the specific ID
+    // remove timers with the specific ID
     auto removeById = [id](std::vector<EntityCallbackTimer>& container)
     {
         container.erase(
@@ -2304,6 +2304,7 @@ bool Entity::MsgRequestServerObjectInfo(GameMessages::RequestServerObjectInfo& r
 	objectInfo.PushDebug<AMFIntValue>("Template ID(LOT)") = GetLOT();
 	objectInfo.PushDebug<AMFStringValue>("Object ID") = std::to_string(GetObjectID());
 	objectInfo.PushDebug<AMFStringValue>("Spawner's Object ID") = std::to_string(GetSpawnerID());
+	objectInfo.PushDebug<AMFStringValue>("Owner override") = std::to_string(m_OwnerOverride);
 
 	auto& componentDetails = objectInfo.PushDebug("Component Information");
 	for (const auto [id, component] : m_Components) {
