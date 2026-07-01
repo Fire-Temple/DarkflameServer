@@ -1661,7 +1661,7 @@ void Entity::Kill(Entity* murderer, const eKillType killType) {
 
 	const auto& grpNameQBShowBricks = GetVarAsString(u"grpNameQBShowBricks");
 	if (!grpNameQBShowBricks.empty()) {
-		for (auto* const spawner :  Game::zoneManager->GetSpawnersByName(grpNameQBShowBricks)) if (spawner) spawner->Spawn();
+		for (auto* const spawner : Game::zoneManager->GetSpawnersByName(grpNameQBShowBricks)) if (spawner) spawner->Spawn();
 		for (auto* const spawner : Game::zoneManager->GetSpawnersInGroup(grpNameQBShowBricks)) if (spawner) spawner->Spawn();
 	}
 
