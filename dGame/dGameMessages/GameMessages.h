@@ -45,6 +45,7 @@ enum class BehaviorSlot : int32_t;
 enum class eVendorTransactionResult : uint32_t;
 enum class eReponseMoveItemBetweenInventoryTypeCode : int32_t;
 enum class eMissionState : int;
+enum class AiState : uint32_t;
 
 enum class eCameraTargetCyclingMode : int32_t {
 	ALLOW_CYCLE_TEAMMATES,
@@ -958,7 +959,7 @@ namespace GameMessages {
 		GetGMInvis() : GameMsg(MessageType::Game::GET_GM_INVIS) {}
 
 		bool bGMInvis{ false };
-  };
+	};
 
 	struct ChildRemoved : public GameMsg {
 		ChildRemoved() : GameMsg(MessageType::Game::CHILD_REMOVED) {}
