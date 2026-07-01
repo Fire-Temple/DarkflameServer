@@ -525,6 +525,10 @@ void BaseCombatAIComponent::Serialize(RakNet::BitStream& outBitStream, bool bIsI
 
 void BaseCombatAIComponent::SetAiState(AiState newState) {
 	if (newState == this->m_State) return;
+	GameMessages::NotifyCombatAIStateChange stateMsg;
+	stateMsg.prevState = this->m_State;
+	stateMsg.newState = newState;
+	m_Parent->HandleMsg(stateMsg);
 	this->m_State = newState;
 	m_DirtyStateOrTarget = true;
 	Game::entityManager->SerializeEntity(m_Parent);
@@ -895,7 +899,7 @@ bool BaseCombatAIComponent::MsgGetObjectReportInfo(GameMessages::GetObjectReport
 	auto& cmptType = reportInfo.info->PushDebug("Base Combat AI");
 	cmptType.PushDebug<AMFIntValue>("Component ID") = GetComponentID();
 	auto& targetInfo = cmptType.PushDebug("Current Target Info");
-	targetInfo.PushDebug<AMFStringValue>("Current Target ID") = std::to_string(m_Target);
+	targetInfo.PushDebug<AMFStringValue>("Current Target ID", "LWOOBJID") = std::to_string(m_Target);
 	// if (m_Target != LWOOBJID_EMPTY) {
 		// LWOGameMessages::ObjGetName nameMsg(m_CurrentTarget);
 		// SEND_GAMEOBJ_MSG(nameMsg);
@@ -936,10 +940,7 @@ bool BaseCombatAIComponent::MsgGetObjectReportInfo(GameMessages::GetObjectReport
 	//}
 	//cmptType.PushDebug("Current Combat Role") = curState;
 
-	auto& tetherPoint = cmptType.PushDebug("Tether Point");
-	tetherPoint.PushDebug<AMFDoubleValue>("X") = m_StartPosition.x;
-	tetherPoint.PushDebug<AMFDoubleValue>("Y") = m_StartPosition.y;
-	tetherPoint.PushDebug<AMFDoubleValue>("Z") = m_StartPosition.z;
+	cmptType.PushDebug("Tether Point").PushDebug(m_StartPosition);
 	cmptType.PushDebug<AMFDoubleValue>("Hard Tether Radius") = m_HardTetherRadius;
 	cmptType.PushDebug<AMFDoubleValue>("Soft Tether Radius") = m_SoftTetherRadius;
 	cmptType.PushDebug<AMFDoubleValue>("Aggro Radius") = m_AggroRadius;

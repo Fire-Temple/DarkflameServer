@@ -189,6 +189,15 @@ void MovementAIComponent::Update(const float deltaTime) {
 					}
 				} else {
 					Stop();
+					if (m_FollowedTarget != LWOOBJID_EMPTY) {
+						GameMessages::GetPosition getPos;
+						if (!getPos.Send(m_FollowedTarget)) {
+							LOG("Target %llu does not exist anymore to follow", m_FollowedTarget);
+							m_FollowedTarget = LWOOBJID_EMPTY;
+						} else {
+							SetDestination(getPos.pos);
+						}
+					}
 					return;
 				}
 			} else {
@@ -526,20 +535,14 @@ bool MovementAIComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInf
 	movementInfo.PushDebug<AMFDoubleValue>("Pulling To Point") = m_PullingToPoint;
 	movementInfo.PushDebug<AMFBoolValue>("At Final Waypoint") = m_AtFinalWaypoint;
 
-	auto& pullPointInfo = movementInfo.PushDebug("Pull Point");
-	pullPointInfo.PushDebug<AMFDoubleValue>("X") = m_PullPoint.x;
-	pullPointInfo.PushDebug<AMFDoubleValue>("Y") = m_PullPoint.y;
-	pullPointInfo.PushDebug<AMFDoubleValue>("Z") = m_PullPoint.z;
+	auto& pullPointInfo = movementInfo.PushDebug("Pull Point").PushDebug(m_PullPoint);
 
 	// movementInfo.PushDebug<AMFDoubleValue>("Delay") = m_Delay;
 
 	auto& waypoints = movementInfo.PushDebug("Interpolated Waypoints");
 	int i = 0;
 	for (const auto& point : m_InterpolatedWaypoints) {
-		auto& waypoint = waypoints.PushDebug("Waypoint " + std::to_string(++i));
-		waypoint.PushDebug<AMFDoubleValue>("X") = point.x;
-		waypoint.PushDebug<AMFDoubleValue>("Y") = point.y;
-		waypoint.PushDebug<AMFDoubleValue>("Z") = point.z;
+		waypoints.PushDebug("Waypoint " + std::to_string(++i)).PushDebug(point);
 	}
 
 	i = 0;
@@ -547,13 +550,30 @@ bool MovementAIComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInf
 	auto pathCopy = m_CurrentPath; // Copy to avoid modifying the original stack
 	while (!pathCopy.empty()) {
 		const auto& waypoint = pathCopy.top();
-		auto& pathWaypoint = currentPath.PushDebug("Waypoint " + std::to_string(++i));
-		pathWaypoint.PushDebug<AMFDoubleValue>("X") = waypoint.position.x;
-		pathWaypoint.PushDebug<AMFDoubleValue>("Y") = waypoint.position.y;
-		pathWaypoint.PushDebug<AMFDoubleValue>("Z") = waypoint.position.z;
+		currentPath.PushDebug("Waypoint " + std::to_string(++i)).PushDebug(waypoint.position);
 
 		pathCopy.pop();
 	}
 
+	movementInfo.PushDebug<AMFStringValue>("Followed Target") = std::to_string(m_FollowedTarget);
+
 	return true;
+}
+
+void MovementAIComponent::FollowTarget(const LWOOBJID target) {
+	if (target == LWOOBJID_EMPTY) {
+		m_FollowedTarget = target;
+		return;
+	}
+	GameMessages::GetPosition getPos;
+	if (!getPos.Send(target)) {
+		LOG("Tried to follow target %llu but they don't exist", target);
+		m_FollowedTarget = LWOOBJID_EMPTY;
+		return;
+	}
+
+	m_FollowedTarget = target;
+	SetMaxSpeed(1.0f);
+	m_CurrentSpeed = 1.0f;
+	SetDestination(getPos.pos);
 }
