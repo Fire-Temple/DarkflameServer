@@ -660,7 +660,7 @@ void Entity::Initialize() {
 
 			const auto timeBeforeSmash = GetVar<float>(u"tmeSmsh");
 
-			if (timeBeforeSmash > 0) {
+			if (timeBeforeSmash != 0) {
 				quickBuildComponent->SetTimeBeforeSmash(timeBeforeSmash);
 			}
 
@@ -1407,7 +1407,7 @@ void Entity::Update(const float deltaTime) {
 		}
 	}
 
-
+	// variable update loop
 	GetScript()->OnUpdate(this);
 
 	for (const auto& component : m_Components | std::views::values) {
@@ -1415,6 +1415,7 @@ void Entity::Update(const float deltaTime) {
 
 		component->Update(deltaTime);
 	}
+
 
 	if (m_ShouldDestroyAfterUpdate) {
 		Game::entityManager->DestroyEntity(this->GetObjectID());
@@ -1991,10 +1992,10 @@ void Entity::SetPosition(const NiPoint3& position) {
 		simple->SetPosition(position);
 	}
 
-	auto* vehicel = GetComponent<HavokVehiclePhysicsComponent>();
+	auto* vehicle = GetComponent<HavokVehiclePhysicsComponent>();
 
-	if (vehicel != nullptr) {
-		vehicel->SetPosition(position);
+	if (vehicle != nullptr) {
+		vehicle->SetPosition(position);
 	}
 
 	auto* rigidBodyPhantomPhysicsComponent = GetComponent<RigidbodyPhantomPhysicsComponent>();
@@ -2025,10 +2026,10 @@ void Entity::SetRotation(const NiQuaternion& rotation) {
 		simple->SetRotation(rotation);
 	}
 
-	auto* vehicel = GetComponent<HavokVehiclePhysicsComponent>();
+	auto* vehicle = GetComponent<HavokVehiclePhysicsComponent>();
 
-	if (vehicel != nullptr) {
-		vehicel->SetRotation(rotation);
+	if (vehicle != nullptr) {
+		vehicle->SetRotation(rotation);
 	}
 
 	auto* rigidBodyPhantomPhysicsComponent = GetComponent<RigidbodyPhantomPhysicsComponent>();

@@ -11,7 +11,7 @@
 #include "eMovementPlatformState.h"
 #include "eReplicaComponentType.h"
 
-#include <chrono>
+#include "MoverSubComponent.h"
 
 class Path;
 
@@ -25,123 +25,6 @@ enum class eMoverSubComponentType : uint32_t {
 	 * Used in NJ
 	 */
 	 simpleMover = 5,
-};
-
-/**
- * Sub component for moving platforms that determine the actual current movement state
- */
-class MoverSubComponent {
-public:
-	MoverSubComponent(const NiPoint3& startPos);
-	~MoverSubComponent();
-
-	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate, bool simpleMover = false, 
-	NiPoint3 simpleMoverPos = {}, NiQuaternion simpleMoverRot = {});
-
-	/**
-	 * The state the platform is currently in
-	 */
-	eMovementPlatformState mState = eMovementPlatformState::Stationary;
-
-	/**
-	 * The waypoint this platform currently wants to traverse to
-	 */
-	uint32_t mDesiredWaypointIndex = -1;
-	
-	/**
-	 * The scheduled waypoint this platform currently wants to traverse to
-	 */
-	int32_t mScheduledWaypoint = 0;	
-
-	/**
-	 * Whether the platform is currently reversing away from the desired waypoint
-	 */
-	bool mInReverse = false;
-
-	/**
-	 * Whether the platform should stop moving when reaching the desired waypoint
-	 */
-	bool mShouldStopAtDesiredWaypoint = false;
-
-	/**
-	 * The percentage of the way between the last point and the desired point
-	 */
-	float mPercentBetweenPoints = 0;
-
-	/**
-	 * The current position of the platform based off current waypoint
-	 */
-	NiPoint3 mPosition{};
-	
-	/**
-	 * The current rotation of the platform based off current waypoint
-	 */
-	NiQuaternion mRotation{};	
-	
-	/**
-	 * Timestamp of when the platform began moving
-	 */	
-	std::chrono::steady_clock::time_point mLegStartTime{};
-
-	/**
-	 * The total travel distance for the platform
-	 */
-	float mLegTotalDistance;
-	
-	/**
-	 * Estimated distance traveled for the platform; always forward facing
-	 */	
-	float mLegDistanceProgress;
-		
-	/**
-	 * Finish the current leg before stopping
-	 */
-	bool mFinishLeg;
-	
-	/**
-	 * The waypoint the platform is (was) at
-	 */
-	uint32_t mCurrentWaypointIndex;
-
-	/**
-	 * The waypoint the platform is attempting to go to
-	 */
-	uint32_t mNextWaypointIndex;
-	
-	/**
-	 * The last waypoint in the path
-	 */
-	uint32_t mLastWaypointIndex;	
-
-	/**
-	 * The timer that handles the time before stopping idling and continue platform movement
-	 */
-	float mIdleTimeElapsed = 0;
-
-	/**
-	 * The speed the platform is currently moving at
-	 */
-	float mSpeed = 0;
-
-	/**
-	 * The time to wait before continuing movement
-	 */
-	float mWaitTime = 0;
-	
-	/**
-	 * Play once the platform starts
-	 */
-	std::string mStartGUID;
-	
-	/**
-	 * Play once the platform stops
-	 */
-	std::string mStopGUID;	
-	
-	/**
-	 * Play during platform pathing
-	 */
-	std::string mTravelGUID;
 };
 
 
@@ -170,6 +53,11 @@ public:
 	 * Starts the pathing, called when an entity completed a quick build associated with this platform
 	 */
 	void OnCompleteQuickBuild();
+
+	/**
+	 * Update platform position on server
+	 */
+	void Update(float deltaTime) override;
 
 	/**
 	 * Instructs the moving platform to go to some waypoint
@@ -203,21 +91,51 @@ public:
 	 * Prepares pathing direction for simple movers (NJ)
 	 */
 	void SimpleMovePrepareForward(bool forward = true);
-
-	/**
-	 * Turn time traveled into distance; always forward facing
-	 */
-	float CalculateDistance();
-
-	/**
-	 * Turn progress times into percent for precise pathing
-	 */
-	float CalculatePercent();
 	
 	/**
 	 * Send resync with server values
 	 */	
 	void Resync(const SystemAddress& sysAddr = UNASSIGNED_SYSTEM_ADDRESS);
+
+	/**
+	 * Returns estimated position of the moving platform
+	 */	
+	Vector3 CalculatePosition();
+	
+	/**
+	 * Returns estimated rotation of the moving platform
+	 */	
+	NiQuaternion CalculateRotation();
+
+	/**
+	 * Returns estimated velocity of the moving platform
+	 */	
+	Vector3 CalculateVelocity();
+	
+	/**
+	 * Returns estimated angular velocity of the moving platform
+	 */	
+	Vector3 CalculateAngularVelocity();
+
+	/**
+	 * Returns pre calculated position of the moving platform
+	 */	
+	Vector3 GetPosition();
+
+	/**
+	 * Returns pre calculated rotation of the moving platform
+	 */	
+	NiQuaternion GetRotation();
+
+	/**
+	 * Returns pre calculated velocity of the moving platform
+	 */	
+	Vector3 GetVelocity();
+
+	/**
+	 * Returns pre calculated angular velocity of the moving platform
+	 */	
+	Vector3 GetAngularVelocity();
 
 	/**
 	 * Determines if the entity should be serialized on the next update
@@ -289,11 +207,6 @@ private:
 	bool m_PathingStopped = true;
 	
 	/**
-	 * Is the platform direclty pathing from GotoWaypoint
-	 */
-	bool m_IsDirectPathing = false;	
-	
-	/**
 	 * Whether the platform has a path
 	 */
 	bool m_HasPath = true;	
@@ -306,7 +219,7 @@ private:
 	/**
 	 * The mover sub component that belongs to this platform
 	 */
-	void* m_MoverSubComponent;
+	MoverSubComponent* subComponent;
 
 	/**
 	 * If speed is actually time in seconds

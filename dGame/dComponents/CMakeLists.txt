@@ -20,6 +20,7 @@ set(DGAME_DCOMPONENTS_SOURCES
 	"ModelComponent.cpp"
 	"ModuleAssemblyComponent.cpp"
 	"MovementAIComponent.cpp"
+	"MoverSubComponent.cpp"
 	"MovingPlatformComponent.cpp"
 	"PetComponent.cpp"
 	"PhantomPhysicsComponent.cpp"

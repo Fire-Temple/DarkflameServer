@@ -4,13 +4,8 @@
 class NjLightningOrb : public CppScripts::Script
 {
 public:
-	
-	void OnFireEventServerSide(
-		Entity* self,
-		Entity* sender,
-		std::string args,
-		int32_t param1,
-		int32_t param2,
-		int32_t param3
-	) override;
+
+	void OnCollisionPhantom(Entity* self, Entity* target) override;
+
+	void ApplyEffect(Entity* self, Entity* target);
 };

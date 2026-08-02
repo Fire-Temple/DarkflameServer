@@ -15,6 +15,8 @@
 #include "StringifiedEnum.h"
 #include "Amf3.h"
 
+#include "MovingPlatformComponent.h"
+
 SimplePhysicsComponent::SimplePhysicsComponent(Entity* parent, const int32_t componentID) : PhysicsComponent(parent, componentID) {
 	RegisterMsg(&SimplePhysicsComponent::OnGetObjectReportInfo);
 
@@ -39,6 +41,8 @@ SimplePhysicsComponent::~SimplePhysicsComponent() {
 
 void SimplePhysicsComponent::Update(const float deltaTime) {
 	if (m_Velocity == NiPoint3Constant::ZERO) return;
+	else if (m_Parent->GetComponent<MovingPlatformComponent>()) return;
+
 	m_Position += m_Velocity * deltaTime;
 	m_DirtyPosition = true;
 	Game::entityManager->SerializeEntity(m_Parent);

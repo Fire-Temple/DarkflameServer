@@ -160,7 +160,7 @@ void SpawnerSpinner30::OnTimerDone(Entity* self, std::string timerName) {
 	if (timerName == "MoveUp") {	
 		auto* movingPlatformComponent = self->GetComponent<MovingPlatformComponent>();
 		auto* subComponent = movingPlatformComponent->GetMoverSubComponent();
-		LOG("CURRENT waypoint %u next waypoint %u", subComponent->mCurrentWaypointIndex, subComponent->mNextWaypointIndex);
+		LOG_DEBUG("CURRENT waypoint %u next waypoint %u", subComponent->mCurrentWaypointIndex, subComponent->mNextWaypointIndex);
 		
 		movingPlatformComponent->GotoWaypoint(1);
 		RenderComponent::PlayAnimation(self, u"up");	
