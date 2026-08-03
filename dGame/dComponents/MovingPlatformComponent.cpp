@@ -230,7 +230,9 @@ void MovingPlatformComponent::Update(float deltaTime) {
 	auto* phantomPhysicsComponent = m_Parent->GetComponent<PhantomPhysicsComponent>();
 	if (phantomPhysicsComponent) {
 		dpEntity* phantomEntity = phantomPhysicsComponent->GetdpEntity();
-		phantomEntity->SetPosition(currentPosition);
+		if (phantomEntity) {
+			phantomEntity->SetPosition(currentPosition);
+		}
 	}
 
 	// TODO: update proximity pose

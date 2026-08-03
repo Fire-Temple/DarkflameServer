@@ -8,15 +8,9 @@ public:
 
 	void OnNotifyObject(Entity* self, Entity* sender, const std::string& name, int32_t param1 = 0, int32_t param2 = 0) override;
 
-	void OnWaypointReached(Entity* self, uint32_t waypointIndex) override;
-	
-	void OnFireEventServerSide(
-		Entity* self,
-		Entity* sender,
-		std::string args,
-		int32_t param1,
-		int32_t param2,
-		int32_t param3) override;
+	void OnCollisionPhantom(Entity* self, Entity* target) override;
+
+	void ApplyEffect(Entity* self, Entity* target);
 
 	void OnTimerDone(Entity* self, std::string timerName) override;
 
