@@ -187,7 +187,8 @@ Now that you are logged in, run the following commands.
 ```bash
 # Creates a user for this computer which uses a password and grant said user all privileges.
 # Change mydarkflameuser to a custom username and password to a custom password. 
-GRANT ALL ON *.* TO 'mydarkflameuser'@'localhost' IDENTIFIED BY 'password' WITH GRANT OPTION;
+CREATE USER 'mydarkflameuser'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO 'mydarkflameuser'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 
 # Then create a database for Darkflame Universe to use.
@@ -502,3 +503,5 @@ This is a Work in Progress, but below are some quick links to documentaion for s
 * pwjones1969
 * [Simon](https://github.com/SimonNitzsche)
 * [ALL OF THE NETDEVIL AND LEGO TEAMS!](https://www.mobygames.com/game/macintosh/lego-universe/credits)
+
+This codebase uses some amount of AI assistance. Some larger portions may be AI generated as well. Do not use AI tools against the repo however to work on issues. Auto generated PR's/issues may be discarded as spam if done in large amounts.
