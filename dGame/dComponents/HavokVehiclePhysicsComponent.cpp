@@ -2,6 +2,9 @@
 #include "EntityManager.h"
 #include "Amf3.h"
 
+#include "dpWorld.h"
+#include "dNavMesh.h"
+
 HavokVehiclePhysicsComponent::HavokVehiclePhysicsComponent(Entity* parent, const int32_t componentID) : PhysicsComponent(parent, componentID) {
 	RegisterMsg(&HavokVehiclePhysicsComponent::OnGetObjectReportInfo);
 
@@ -35,6 +38,10 @@ void HavokVehiclePhysicsComponent::SetIsOnRail(bool val) {
 	if (val == m_IsOnRail) return;
 	m_DirtyPosition = true;
 	m_IsOnRail = val;
+}
+
+void HavokVehiclePhysicsComponent::ClearAirborneTime() {
+	m_AirborneTime = 0.0f;
 }
 
 void HavokVehiclePhysicsComponent::SetRemoteInputInfo(const RemoteInputInfo& remoteInputInfo) {
@@ -100,6 +107,43 @@ void HavokVehiclePhysicsComponent::Serialize(RakNet::BitStream& outBitStream, bo
 	}
 
 	outBitStream.Write0();
+}
+
+void HavokVehiclePhysicsComponent::Update(float deltaTime) {
+	// update grounded value
+	bool grounded = CalculateIsOnGround();
+	SetIsOnGround(grounded);
+	
+	// add delta time to airborne time
+	if (!grounded) m_AirborneTime += deltaTime;
+}
+
+bool HavokVehiclePhysicsComponent::CalculateIsOnGround() {
+    auto* navMesh = dpWorld::GetNavMesh();
+    if (!navMesh) {
+        // LOG_DEBUG("Could not get navmesh");
+        return true;
+    }
+
+	bool grounded = true;	
+	
+	// 43 degree angle check
+    NiQuaternion rotation = m_Parent->GetRotation();
+    Vector3 vehicleUp = QuatUtils::Up(rotation);
+    Vector3 worldUp{ 0.0f, 1.0f, 0.0f };
+    float upAngle = Vector3::Angle(vehicleUp, worldUp);
+    float maxAngle = 43.0f * QuatUtils::PI_OVER_180;
+	
+	// are we within angle bounds?
+	if (upAngle < maxAngle) {
+		NiPoint3 currentPosition = m_Parent->GetPosition();
+		NavDistance navDistance = navMesh->NearestPointDistance(currentPosition);
+		
+		// are we airborne?
+		if (navDistance.noPointInExtent || navDistance.distance > 3.0f) grounded = false;
+	}
+	
+	return grounded;
 }
 
 bool HavokVehiclePhysicsComponent::OnGetObjectReportInfo(GameMessages::GetObjectReportInfo& reportInfo) {

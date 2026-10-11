@@ -13,6 +13,8 @@
 #include "DluAssert.h"
 #include "DetourExtensions.h"
 
+#include <cmath>
+
 dNavMesh::dNavMesh(uint32_t zoneId) {
 	m_ZoneId = zoneId;
 
@@ -108,6 +110,30 @@ void dNavMesh::LoadNavmesh() {
 	}
 
 	m_NavMesh = mesh;
+}
+
+NavDistance dNavMesh::NearestPointDistance(const NiPoint3& location, float halfExtent) const {
+    NavDistance result;
+    if (!m_NavMesh || !m_NavQuery) return result;
+
+    float pos[3] = { location.x, location.y, location.z };
+    float polyPickExt[3] = { halfExtent, halfExtent, halfExtent };
+    float nearestPoint[3]{ };
+    dtPolyRef nearestRef = 0;
+    dtQueryFilter filter{ };
+
+    dtStatus status = m_NavQuery->findNearestPoly(pos, polyPickExt, &filter, &nearestRef, nearestPoint);
+
+    if (!dtStatusSucceed(status)) return result;
+    else if (nearestRef == 0) {
+        result.noPointInExtent = true;
+        return result;
+    }
+
+    NiPoint3 nearest{ nearestPoint[0], nearestPoint[1], nearestPoint[2] };
+    result.distance = Vector3::Distance(location, nearest);
+
+    return result;
 }
 
 NiPoint3 dNavMesh::NearestPoint(const NiPoint3& location, const float halfExtent) const {

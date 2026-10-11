@@ -740,7 +740,7 @@ void CharacterComponent::InitializeStatisticsFromString(const std::string& stati
 	m_TotalImaginationRestored = GetStatisticFromSplit(split, 16);
 	m_TotalImaginationUsed = GetStatisticFromSplit(split, 17);
 	m_DistanceDriven = GetStatisticFromSplit(split, 18);
-	m_TimeAirborneInCar = GetStatisticFromSplit(split, 19); // WONTFIX
+	m_TimeAirborneInCar = GetStatisticFromSplit(split, 19);
 	m_RacingImaginationPowerUpsCollected = GetStatisticFromSplit(split, 20);
 	m_RacingImaginationCratesSmashed = GetStatisticFromSplit(split, 21);
 	m_RacingCarBoostsActivated = GetStatisticFromSplit(split, 22);

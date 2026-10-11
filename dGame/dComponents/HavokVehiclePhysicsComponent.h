@@ -17,6 +17,10 @@ public:
 
 	void Serialize(RakNet::BitStream& outBitStream, bool bIsInitialUpdate) override;
 
+	void Update(float deltaTime) override;	
+	
+	bool CalculateIsOnGround();
+
 	/**
 	 * Sets the velocity
 	 * @param vel the new velocity
@@ -65,6 +69,17 @@ public:
 	 */
 	const bool GetIsOnRail() const { return m_IsOnRail; }
 
+	/**
+	 * Clears the vehicle airborne time
+	 */
+	void ClearAirborneTime();
+	
+	/**
+	 * Gets the the vehicle airborne time
+	 * @return airborne time in seconds
+	 */
+	const float GetAirborneTime() const { return m_AirborneTime; }
+
 	void SetRemoteInputInfo(const RemoteInputInfo&);
 
 private:
@@ -79,4 +94,6 @@ private:
 	float m_SoftUpdate = 0;
 	uint32_t m_EndBehavior;
 	RemoteInputInfo m_RemoteInputInfo;
+	
+	float m_AirborneTime = 0;
 };

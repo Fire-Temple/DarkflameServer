@@ -2177,6 +2177,8 @@ void Entity::ProcessPositionUpdate(PositionUpdate& update) {
 	auto* possessorComponent = GetComponent<PossessorComponent>();
 	bool updateChar = true;
 
+	// LOG_DEBUG("Is grounded: %s", update.onGround ? "TRUE" : "FALSE");
+
 	if (possessorComponent) {
 		auto* possassableEntity = Game::entityManager->GetEntity(possessorComponent->GetPossessable());
 
@@ -2190,7 +2192,8 @@ void Entity::ProcessPositionUpdate(PositionUpdate& update) {
 			if (havokVehiclePhysicsComponent) {
 				havokVehiclePhysicsComponent->SetPosition(update.position);
 				havokVehiclePhysicsComponent->SetRotation(update.rotation);
-				havokVehiclePhysicsComponent->SetIsOnGround(update.onGround);
+				// handled in havokVehiclePhysicsComponent::Update
+				// havokVehiclePhysicsComponent->SetIsOnGround(update.onGround);
 				havokVehiclePhysicsComponent->SetIsOnRail(update.onRail);
 				havokVehiclePhysicsComponent->SetVelocity(update.velocity);
 				havokVehiclePhysicsComponent->SetAngularVelocity(update.angularVelocity);

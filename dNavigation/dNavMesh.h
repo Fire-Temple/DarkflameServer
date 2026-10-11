@@ -14,6 +14,11 @@ class dtNavMesh;
 class dtNavMeshQuery;
 class rcContext;
 
+struct NavDistance {
+	float distance = 0;
+	bool noPointInExtent = false;
+};
+
 class dNavMesh {
 public:
 	dNavMesh(uint32_t zoneId);
@@ -29,6 +34,7 @@ public:
 	 */
 	float GetHeightAtPoint(const NiPoint3& location, const float halfExtentsHeight = 32.0f) const;
 	std::vector<NiPoint3> GetPath(const NiPoint3& startPos, const NiPoint3& endPos, float speed = 10.0f);
+	NavDistance NearestPointDistance(const NiPoint3& location, float halfExtent = 32.0f) const;
 	NiPoint3 NearestPoint(const NiPoint3& location, const float halfExtent = 32.0f) const;
 	bool IsNavmeshLoaded() { return m_NavMesh != nullptr; }
 

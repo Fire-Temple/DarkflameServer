@@ -634,10 +634,8 @@ void RacingControlComponent::Update(float deltaTime) {
 					LWOOBJID_EMPTY, UNASSIGNED_SYSTEM_ADDRESS);
 
 				for (const auto& player : m_RacingPlayers) {
-					auto* vehicle =
-						Game::entityManager->GetEntity(player.vehicleID);
-					auto* playerEntity =
-						Game::entityManager->GetEntity(player.playerID);
+					auto* vehicle = Game::entityManager->GetEntity(player.vehicleID);
+					auto* playerEntity = Game::entityManager->GetEntity(player.playerID);
 
 					if (vehicle != nullptr && playerEntity != nullptr) {
 						GameMessages::SendTeleport(
@@ -656,8 +654,7 @@ void RacingControlComponent::Update(float deltaTime) {
 						}
 
 						Game::entityManager->SerializeEntity(vehicle);
-						Game::entityManager->SerializeEntity(
-							playerEntity);
+						Game::entityManager->SerializeEntity(playerEntity);
 					}
 				}
 
@@ -667,10 +664,8 @@ void RacingControlComponent::Update(float deltaTime) {
 
 				// Reset players to their start location, without smashing them
 				for (auto& player : m_RacingPlayers) {
-					auto* vehicleEntity =
-						Game::entityManager->GetEntity(player.vehicleID);
-					auto* playerEntity =
-						Game::entityManager->GetEntity(player.playerID);
+					auto* vehicleEntity = Game::entityManager->GetEntity(player.vehicleID);
+					auto* playerEntity = Game::entityManager->GetEntity(player.playerID);
 
 					if (vehicleEntity == nullptr || playerEntity == nullptr) {
 						continue;
@@ -686,22 +681,18 @@ void RacingControlComponent::Update(float deltaTime) {
 			else if (m_StartTimer >= 6) {
 				// Activate the players movement
 				for (auto& player : m_RacingPlayers) {
-					auto* vehicleEntity =
-						Game::entityManager->GetEntity(player.vehicleID);
-					auto* playerEntity =
-						Game::entityManager->GetEntity(player.playerID);
+					auto* vehicleEntity = Game::entityManager->GetEntity(player.vehicleID);
+					auto* playerEntity = Game::entityManager->GetEntity(player.playerID);
 
 					if (vehicleEntity == nullptr || playerEntity == nullptr) {
 						continue;
 					}
 
-					GameMessages::SendVehicleUnlockInput(
-						player.vehicleID, false, UNASSIGNED_SYSTEM_ADDRESS);
+					GameMessages::SendVehicleUnlockInput(player.vehicleID, false, UNASSIGNED_SYSTEM_ADDRESS);
 				}
 
 				// Start the race
-				GameMessages::SendActivityStart(m_Parent->GetObjectID(),
-					UNASSIGNED_SYSTEM_ADDRESS);
+				GameMessages::SendActivityStart(m_Parent->GetObjectID(), UNASSIGNED_SYSTEM_ADDRESS);
 
 				m_Started = true;
 
@@ -721,19 +712,35 @@ void RacingControlComponent::Update(float deltaTime) {
 	}
 
 	// Race routines
-	auto* path = Game::zoneManager->GetZone()->GetPath(
-		GeneralUtils::UTF16ToWTF8(m_PathName));
+	auto* path = Game::zoneManager->GetZone()->GetPath(GeneralUtils::UTF16ToWTF8(m_PathName));
 
 	for (auto& player : m_RacingPlayers) {
 		auto* vehicle = Game::entityManager->GetEntity(player.vehicleID);
-		auto* playerEntity =
-			Game::entityManager->GetEntity(player.playerID);
-
-		if (vehicle == nullptr || playerEntity == nullptr) {
-			continue;
-		}
+		auto* playerEntity = Game::entityManager->GetEntity(player.playerID);
+		if (vehicle == nullptr || playerEntity == nullptr) continue;
 
 		const auto vehiclePosition = vehicle->GetPosition();
+		auto* havokVehiclePhysicsComponent = vehicle->GetComponent<HavokVehiclePhysicsComponent>();
+
+		// update vehicle airborne statistic
+		if (havokVehiclePhysicsComponent != nullptr) {		
+			bool vehicleGrounded = havokVehiclePhysicsComponent->GetIsOnGround();
+			float airborneTime = havokVehiclePhysicsComponent->GetAirborneTime();	
+			// LOG_DEBUG("total time airborne: %f", airborneTime);
+			
+			if (vehicleGrounded && airborneTime > 0.5f) {	
+				auto* characterComponent = playerEntity->GetComponent<CharacterComponent>();
+
+				if (characterComponent != nullptr) {
+					// round to seconds then assign
+					uint64_t airborneSeconds = static_cast<uint64_t>(std::round(airborneTime));
+					characterComponent->UpdatePlayerStatistic(TimeAirborneInCar, airborneSeconds);
+
+					// reset time
+					havokVehiclePhysicsComponent->ClearAirborneTime();
+				}
+			}
+		}
 
 		// If the player is this far below the map, safe to assume they should
 		// be smashed by death plane
@@ -816,8 +823,7 @@ void RacingControlComponent::Update(float deltaTime) {
 
 				player.lap++;
 
-				auto* missionComponent =
-					playerEntity->GetComponent<MissionComponent>();
+				auto* missionComponent = playerEntity->GetComponent<MissionComponent>();
 
 				if (missionComponent != nullptr) {
 
@@ -860,12 +866,10 @@ void RacingControlComponent::Update(float deltaTime) {
 					}
 				}
 
-				LOG("Lapped (%i) in (%llums %fs)", player.lap,
-					lapTime.count(), lapTime.count() / 1000.0f);
+				LOG("Lapped (%i) in (%llums %fs)", player.lap, lapTime.count(), lapTime.count() / 1000.0f);
 			}
 
-			LOG("Reached point (%i)/(%i)", player.respawnIndex,
-				path->pathWaypoints.size());
+			LOG("Reached point (%i)/(%i)", player.respawnIndex, path->pathWaypoints.size());
 
 			break;
 		}
