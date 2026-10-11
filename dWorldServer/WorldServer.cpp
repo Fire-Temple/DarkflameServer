@@ -1404,14 +1404,20 @@ void HandlePacket(Packet* packet) {
 				LOG("Unable to get user to parse chat message");
 				return;
 			}
-
-			if (user->GetIsMuted()) {
-				user->GetLastUsedChar()->SendMuteNotice();
+			
+			const auto* const lastChar = user->GetLastUsedChar();
+			if (!lastChar) {
+				LOG("No last used character for chat message %i", user->GetAccountID());
 				return;
 			}
-			std::string playerName = user->GetLastUsedChar()->GetName();
-			bool isMythran = user->GetLastUsedChar()->GetGMLevel() > eGameMasterLevel::CIVILIAN;
-			bool isOk = Game::chatFilter->IsSentenceOkay(GeneralUtils::UTF16ToWTF8(chatMessage.message), user->GetLastUsedChar()->GetGMLevel()).empty();
+
+			if (user->GetIsMuted()) {
+				lastChar->SendMuteNotice();
+				return;
+			}
+			std::string playerName = lastChar->GetName();
+			bool isMythran = lastChar->GetGMLevel() > eGameMasterLevel::CIVILIAN;
+			bool isOk = Game::chatFilter->IsSentenceOkay(GeneralUtils::UTF16ToWTF8(chatMessage.message), lastChar->GetGMLevel()).empty();
 			if (Game::config->GetValue("disable_chat_filter") == "1") isOk = true;
 			LOG_DEBUG("Msg: %s was approved previously? %i", GeneralUtils::UTF16ToWTF8(chatMessage.message).c_str(), user->GetLastChatMessageApproved());
 			if (!isOk) return;
