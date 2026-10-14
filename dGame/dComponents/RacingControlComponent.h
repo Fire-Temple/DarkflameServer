@@ -89,6 +89,16 @@ struct RacingPlayerInfo {
 	 * Whether or not the player should be smashed if the game is reloaded
 	 */
 	bool noSmashOnReload = false;
+	
+	/**
+	 * Whether or not the player is smashed and ready for respawn
+	 */	
+	bool isSmashed = false;
+
+	/**
+	 * Elapsed time (in seconds) since the player smashed their car last
+	 */
+	float lastSmashedTime;
 
 	/**
 	 * Whether or not this player has collected their rewards from completing the race

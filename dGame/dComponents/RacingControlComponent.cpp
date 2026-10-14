@@ -83,8 +83,7 @@ void RacingControlComponent::OnPlayerLoaded(Entity* player) {
 	// not live accurate to stun the player but prevents them from using skills during the race that are not meant to be used.
 	GameMessages::SendSetStunned(player->GetObjectID(), eStateChangeType::PUSH, player->GetSystemAddress(), LWOOBJID_EMPTY, true, true, true, true, true, true, true, true, true);
 
-	LOG("Loading player %i",
-		m_LoadedPlayers);
+	LOG("Loading player %i", m_LoadedPlayers);
 	m_LobbyPlayers.push_back(player->GetObjectID());
 }
 
@@ -92,15 +91,10 @@ void RacingControlComponent::LoadPlayerVehicle(Entity* player,
 	uint32_t positionNumber, bool initialLoad) {
 	// Load the player's vehicle.
 
-	if (player == nullptr) {
-		return;
-	}
+	if (player == nullptr) return;
 
 	auto* inventoryComponent = player->GetComponent<InventoryComponent>();
-
-	if (inventoryComponent == nullptr) {
-		return;
-	}
+	if (inventoryComponent == nullptr) return;
 
 	// Find the player's vehicle.
 
@@ -291,18 +285,21 @@ void RacingControlComponent::OnRequestDie(Entity* player, const std::u16string& 
 	// them.
 
 	for (auto& racingPlayer : m_RacingPlayers) {
-		if (racingPlayer.playerID != player->GetObjectID()) {
-			continue;
-		}
+		if (racingPlayer.playerID != player->GetObjectID()) continue;
 
-		auto* vehicle =
-			Game::entityManager->GetEntity(racingPlayer.vehicleID);
-
+		auto* vehicle = Game::entityManager->GetEntity(racingPlayer.vehicleID);
 		if (!vehicle) return;
+		
+		// reset lastSmashedTime
+		racingPlayer.lastSmashedTime = 0.0f;
 
 		if (!racingPlayer.noSmashOnReload) {
+			// Is the player already smashed?
+			if (racingPlayer.isSmashed) return;
+			racingPlayer.isSmashed = true;
+
 			racingPlayer.smashedTimes++;
-			LOG("Death type %s", GeneralUtils::UTF16ToWTF8(deathType).c_str());
+			LOG("Death type: %s", GeneralUtils::UTF16ToWTF8(deathType).c_str());
 			GameMessages::SendDie(vehicle, vehicle->GetObjectID(), LWOOBJID_EMPTY, true,
 				eKillType::VIOLENT, deathType, 0, 0, 90.0f, false, true, 0);
 
@@ -335,12 +332,11 @@ void RacingControlComponent::OnRequestDie(Entity* player, const std::u16string& 
 				// Reset imagination to half its current value, rounded up to the nearest value divisible by 10, as it was done in live.
 				if (destroyableComponent) destroyableComponent->SetImagination(respawnImagination);
 				Game::entityManager->SerializeEntity(vehicle);
-				});
+			});
 
 			auto* characterComponent = player->GetComponent<CharacterComponent>();
-			if (characterComponent != nullptr) {
-				characterComponent->UpdatePlayerStatistic(RacingTimesWrecked);
-			}
+			if (characterComponent != nullptr) characterComponent->UpdatePlayerStatistic(RacingTimesWrecked);
+
 		} else {
 			GameMessages::SendRacingSetPlayerResetInfo(
 				m_Parent->GetObjectID(), racingPlayer.lap,
@@ -356,20 +352,17 @@ void RacingControlComponent::OnRequestDie(Entity* player, const std::u16string& 
 
 void RacingControlComponent::OnRacingPlayerInfoResetFinished(Entity* player) {
 	// When the player has respawned.
-
 	for (auto& racingPlayer : m_RacingPlayers) {
-		if (racingPlayer.playerID != player->GetObjectID()) {
-			continue;
-		}
+		const auto playerID = racingPlayer.playerID;
+		if (playerID != player->GetObjectID()) continue;
 
-		auto* vehicle =
-			Game::entityManager->GetEntity(racingPlayer.vehicleID);
-
-		if (vehicle == nullptr) {
-			return;
-		}
+		auto* vehicle = Game::entityManager->GetEntity(racingPlayer.vehicleID);
+		if (vehicle == nullptr) return;
 
 		racingPlayer.noSmashOnReload = false;
+
+		// Reset smashed status
+		racingPlayer.isSmashed = false;
 
 		return;
 	}
@@ -378,9 +371,7 @@ void RacingControlComponent::OnRacingPlayerInfoResetFinished(Entity* player) {
 void RacingControlComponent::HandleMessageBoxResponse(Entity* player, int32_t button, const std::string& id) {
 	auto* data = GetPlayerData(player->GetObjectID());
 
-	if (data == nullptr) {
-		return;
-	}
+	if (data == nullptr) return;
 
 	if (id == "rewardButton") {
 		if (data->collectedRewards) return;
@@ -402,10 +393,7 @@ void RacingControlComponent::HandleMessageBoxResponse(Entity* player, int32_t bu
 			player->GetObjectID(), UNASSIGNED_SYSTEM_ADDRESS);
 	} else if ((id == "ACT_RACE_EXIT_THE_RACE?" || id == "Exit") && button == m_ActivityExitConfirm) {
 		auto* vehicle = Game::entityManager->GetEntity(data->vehicleID);
-
-		if (vehicle == nullptr) {
-			return;
-		}
+		if (vehicle == nullptr) return;
 
 		// Exiting race
 		GameMessages::SendNotifyRacingClient(
@@ -413,7 +401,6 @@ void RacingControlComponent::HandleMessageBoxResponse(Entity* player, int32_t bu
 			player->GetObjectID(), UNASSIGNED_SYSTEM_ADDRESS);
 
 		auto* characterComponent = player->GetComponent<CharacterComponent>();
-
 		if (characterComponent) characterComponent->SendToZone(m_MainWorld);
 
 		vehicle->Kill();
@@ -562,12 +549,8 @@ void RacingControlComponent::Update(float deltaTime) {
 			for (size_t positionNumber = 0; positionNumber < m_LobbyPlayers.size(); positionNumber++) {
 				LOG("Loading player now!");
 
-				auto* player =
-					Game::entityManager->GetEntity(m_LobbyPlayers[positionNumber]);
-
-				if (player == nullptr) {
-					return;
-				}
+				auto* player = Game::entityManager->GetEntity(m_LobbyPlayers[positionNumber]);
+				if (player == nullptr) return;
 
 				LOG("Loading player now NOW!");
 
@@ -601,15 +584,10 @@ void RacingControlComponent::Update(float deltaTime) {
 		// If less then 2 players are left, send the rest back to the main world
 		if (m_LoadedPlayers < 2 && !(m_LoadedPlayers == 1 && m_SoloRacing)) {
 			for (const auto player : m_LobbyPlayers) {
-				auto* playerEntity =
-					Game::entityManager->GetEntity(player);
-
-				if (playerEntity == nullptr) {
-					continue;
-				}
+				auto* playerEntity = Game::entityManager->GetEntity(player);
+				if (playerEntity == nullptr) continue;
 
 				auto* characterComponent = playerEntity->GetComponent<CharacterComponent>();
-
 				if (characterComponent) characterComponent->SendToZone(m_MainWorld);
 			}
 
@@ -646,8 +624,7 @@ void RacingControlComponent::Update(float deltaTime) {
 						vehicle->SetPosition(player.respawnPosition);
 						vehicle->SetRotation(player.respawnRotation);
 
-						auto* destroyableComponent =
-							vehicle->GetComponent<DestroyableComponent>();
+						auto* destroyableComponent = vehicle->GetComponent<DestroyableComponent>();
 
 						if (destroyableComponent != nullptr) {
 							destroyableComponent->SetImagination(0);
@@ -719,6 +696,9 @@ void RacingControlComponent::Update(float deltaTime) {
 		auto* playerEntity = Game::entityManager->GetEntity(player.playerID);
 		if (vehicle == nullptr || playerEntity == nullptr) continue;
 
+		// progress lastSmashedTime
+		player.lastSmashedTime += deltaTime;
+
 		const auto vehiclePosition = vehicle->GetPosition();
 		auto* havokVehiclePhysicsComponent = vehicle->GetComponent<HavokVehiclePhysicsComponent>();
 
@@ -742,9 +722,9 @@ void RacingControlComponent::Update(float deltaTime) {
 			}
 		}
 
-		// If the player is this far below the map, safe to assume they should
-		// be smashed by death plane
-		if (vehiclePosition.y < -500) {
+		// If the player is this far below the map, safe to assume they should be smashed by death plane
+		// Also add a resonable cooldown for this check
+		if (vehiclePosition.y < -500 && player.lastSmashedTime > 4) {	
 			GameMessages::SendDie(vehicle, m_Parent->GetObjectID(),
 				LWOOBJID_EMPTY, true, eKillType::VIOLENT, u"", 0, 0, 0,
 				true, false, 0);

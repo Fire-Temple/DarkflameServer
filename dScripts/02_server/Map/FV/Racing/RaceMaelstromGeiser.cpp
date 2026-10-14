@@ -15,54 +15,23 @@ void RaceMaelstromGeiser::OnStartup(Entity* self) {
 }
 
 void RaceMaelstromGeiser::OnProximityUpdate(Entity* self, Entity* entering, std::string name, std::string status) {
-	if (!entering->IsPlayer() || name != "deathZone" || status != "ENTER") {
+	if (!entering->IsPlayer() || name != "deathZone" || status != "ENTER" || !self->GetVar<bool>(u"AmFiring")) {
 		return;
+
 	}
 
-	if (!self->GetVar<bool>(u"AmFiring")) {
-		return;
-	}
+	auto* possessorComponent = entering->GetComponent<PossessorComponent>();
+	if (possessorComponent != nullptr) {
+		auto* vehicle = Game::entityManager->GetEntity(possessorComponent->GetPossessable());
+		if (vehicle != nullptr) {
+			GameMessages::SendDie(vehicle, self->GetObjectID(), LWOOBJID_EMPTY, true, eKillType::VIOLENT, u"", 0, 0, 0, true, false, 0);
 
-	auto* possessableComponent = entering->GetComponent<PossessableComponent>();
-
-	Entity* vehicle;
-	Entity* player;
-
-	if (possessableComponent != nullptr) {
-		player = Game::entityManager->GetEntity(possessableComponent->GetPossessor());
-
-		if (player == nullptr) {
-			return;
-		}
-
-		vehicle = entering;
-	} else if (entering->IsPlayer()) {
-		auto* possessorComponent = entering->GetComponent<PossessorComponent>();
-
-		if (possessorComponent == nullptr) {
-			return;
-		}
-
-		vehicle = Game::entityManager->GetEntity(possessorComponent->GetPossessable());
-
-		if (vehicle == nullptr) {
-			return;
-		}
-
-		player = entering;
-	} else {
-		return;
-	}
-
-
-	GameMessages::SendDie(vehicle, self->GetObjectID(), LWOOBJID_EMPTY, true, eKillType::VIOLENT, u"", 0, 0, 0, true, false, 0);
-
-	auto* zoneController = Game::zoneManager->GetZoneControlObject();
-
-	auto* racingControlComponent = zoneController->GetComponent<RacingControlComponent>();
-
-	if (racingControlComponent != nullptr) {
-		racingControlComponent->OnRequestDie(player);
+			auto* zoneController = Game::zoneManager->GetZoneControlObject();
+			auto* racingControlComponent = zoneController->GetComponent<RacingControlComponent>();
+			if (racingControlComponent != nullptr) {
+				racingControlComponent->OnRequestDie(entering);
+			}	
+		}	
 	}
 }
 
